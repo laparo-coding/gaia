@@ -1,0 +1,164 @@
+name: Deploy iPad Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Semver release tag (vMAJOR.MINOR.PATCH)"
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    runs-on: macos-15
+    environment: production
+    env:
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+      IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+      IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+      IOS_WORKSPACE: ${{ vars.IOS_WORKSPACE }}
+      IOS_PROJECT: ${{ vars.IOS_PROJECT }}
+      IOS_SCHEME: ${{ vars.IOS_SCHEME }}
+      IOS_CONFIGURATION: ${{ vars.IOS_CONFIGURATION }}
+      IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD }}
+      IOS_ARCHIVE_PATH: ${{ github.workspace }}/artifacts/GaiaApp.xcarchive
+      IOS_EXPORT_PATH: ${{ github.workspace }}/artifacts/export
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate tag format
+        run: |
+          TAG="${{ github.event.inputs.release_tag }}"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid tag format: $TAG"
+            exit 1
+          fi
+
+      - name: Validate actor authorization
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+            permission=$(curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${{ github.repository }}/collaborators/${{ github.actor }}/permission" \
+              | jq -r '.permission')
+
+            if [[ "$permission" != "admin" ]]; then
+              echo "Actor ${{ github.actor }} is not an admin (permission=$permission)"
+              exit 1
+            fi
+
+            echo "Actor authorization passed for ${{ github.actor }}"
+
+      - name: Validate signing inputs
+        run: ./scripts/ci-cd/preflight-check.sh
+
+      - name: Build archive
+        run: |
+          mkdir -p artifacts "$IOS_EXPORT_PATH"
+
+          xcode_target_args=()
+          if [[ -n "${IOS_WORKSPACE:-}" ]]; then
+            xcode_target_args+=( -workspace "$IOS_WORKSPACE" )
+          elif [[ -n "${IOS_PROJECT:-}" ]]; then
+            xcode_target_args+=( -project "$IOS_PROJECT" )
+          else
+            echo "Either IOS_WORKSPACE or IOS_PROJECT must be configured as repository variable"
+            exit 1
+          fi
+
+          if [[ -z "${IOS_SCHEME:-}" ]]; then
+            echo "IOS_SCHEME repository variable is required"
+            exit 1
+          fi
+
+          if [[ -z "${IOS_CONFIGURATION:-}" ]]; then
+            IOS_CONFIGURATION="Release"
+          fi
+
+          if [[ -z "${IOS_EXPORT_METHOD:-}" ]]; then
+            IOS_EXPORT_METHOD="ad-hoc"
+          fi
+
+          xcodebuild archive \
+            "${xcode_target_args[@]}" \
+            -scheme "$IOS_SCHEME" \
+            -configuration "$IOS_CONFIGURATION" \
+            -archivePath "$IOS_ARCHIVE_PATH" \
+            -destination 'generic/platform=iOS' \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+            PRODUCT_BUNDLE_IDENTIFIER="$IOS_BUNDLE_ID" \
+            CODE_SIGN_STYLE=Manual
+
+      - name: Publish artifacts
+        run: |
+          mkdir -p artifacts
+
+          if [[ -z "${IOS_EXPORT_METHOD:-}" ]]; then
+            IOS_EXPORT_METHOD="ad-hoc"
+          fi
+
+          cat > artifacts/ExportOptions.plist <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+            <dict>
+              <key>method</key>
+              <string>${IOS_EXPORT_METHOD}</string>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>teamID</key>
+              <string>${IOS_TEAM_ID}</string>
+              <key>stripSwiftSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+            </dict>
+          </plist>
+          PLIST
+
+          xcodebuild -exportArchive \
+            -archivePath "$IOS_ARCHIVE_PATH" \
+            -exportPath "$IOS_EXPORT_PATH" \
+            -exportOptionsPlist artifacts/ExportOptions.plist
+
+          ipa_file=$(find "$IOS_EXPORT_PATH" -maxdepth 1 -name '*.ipa' | head -n 1)
+          if [[ -z "${ipa_file:-}" ]]; then
+            echo "No IPA produced during export"
+            exit 1
+          fi
+          cp "$ipa_file" artifacts/app.ipa
+
+          dsym_dir=$(find "$IOS_ARCHIVE_PATH"/dSYMs -maxdepth 1 -name '*.dSYM' | head -n 1)
+          if [[ -z "${dsym_dir:-}" ]]; then
+            echo "No dSYM bundle found in archive"
+            exit 1
+          fi
+          ditto -c -k --sequesterRsrc --keepParent "$dsym_dir" artifacts/symbols.dSYM.zip
+
+          app_version=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleShortVersionString' "$IOS_ARCHIVE_PATH/Info.plist")
+          build_number=$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleVersion' "$IOS_ARCHIVE_PATH/Info.plist")
+
+          cat > artifacts/release.json <<JSON
+          {
+            "version": "$app_version",
+            "buildNumber": "$build_number",
+            "commitSha": "${{ github.sha }}",
+            "paths": {
+              "ipa": "artifacts/app.ipa",
+              "symbols": "artifacts/symbols.dSYM.zip",
+              "metadata": "artifacts/release.json"
+            }
+          }
+          JSON
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-release-${{ github.event.inputs.release_tag }}
+          path: artifacts/

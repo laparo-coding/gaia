@@ -1,0 +1,177 @@
+openapi: 3.1.0
+info:
+  title: Gaia Authentication Contracts
+  version: 0.1.0
+  description: >-
+    Planned contracts for Gaia interactive authentication and internal
+    service-auth orchestration for Hemera and Aither.
+servers:
+  - url: https://gaia.local
+paths:
+  /api/auth/session:
+    get:
+      summary: Read the current interactive session state
+      operationId: getSession
+      responses:
+        '200':
+          description: Session state resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionState'
+        '401':
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      summary: Sign out the current interactive session
+      operationId: deleteSession
+      responses:
+        '204':
+          description: Session cleared
+        '401':
+          description: No active session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/sign-in:
+    post:
+      summary: Begin the interactive sign-in flow
+      operationId: beginSignIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+      responses:
+        '200':
+          description: Sign-in flow started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignInResponse'
+        '400':
+          description: Invalid sign-in request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/service/hemera/authorize:
+    post:
+      summary: Ensure Gaia has a valid Hemera service credential
+      operationId: authorizeHemeraService
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceAuthorizationRequest'
+      responses:
+        '200':
+          description: Hemera service auth is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceAuthorizationResponse'
+        '502':
+          description: Hemera service auth failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/service/aither/authorize:
+    post:
+      summary: Ensure Gaia has a valid Aither service credential
+      operationId: authorizeAitherService
+      x-internal: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceAuthorizationRequest'
+      responses:
+        '200':
+          description: Aither service auth is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServiceAuthorizationResponse'
+        '502':
+          description: Aither service auth failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    SessionState:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [unauthenticated, authenticating, authenticated, expired, signedOut, failed]
+        subjectId:
+          type: string
+        role:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        returnToPath:
+          type: string
+    SignInRequest:
+      type: object
+      required: [returnToPath]
+      properties:
+        returnToPath:
+          type: string
+          description: Safe internal path to continue after sign-in.
+    SignInResponse:
+      type: object
+      required: [status, nextUrl]
+      properties:
+        status:
+          type: string
+          enum: [challenge, complete]
+        nextUrl:
+          type: string
+    ServiceAuthorizationRequest:
+      type: object
+      required: [operation]
+      properties:
+        operation:
+          type: string
+        requestId:
+          type: string
+    ServiceAuthorizationResponse:
+      type: object
+      required: [service, status, retryOnExpiry]
+      properties:
+        service:
+          type: string
+          enum: [hemera, aither]
+        status:
+          type: string
+          enum: [authorized, refreshed, degraded]
+        retryOnExpiry:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string

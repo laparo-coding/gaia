@@ -1,62 +1,61 @@
-# Xcode
-#
-# gitignore contributors: remember to update Global/Xcode.gitignore, Objective-C.gitignore & Swift.gitignore
+# macOS
+.DS_Store
+**/.DS_Store
 
-## User settings
-xcuserdata/
+# Node/Next.js
+node_modules/
+.next/
+.vercel/
+dist/
+build/
+coverage/
+tsconfig.tsbuildinfo
+next-env.d.ts
 
-## Obj-C/Swift specific
-*.hmap
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-## App packaging
-*.ipa
-*.dSYM.zip
-*.dSYM
+# Env files
+.env
+.env.*
+.env.local
+.env.*.local
+!.env.example
+!.env.local.example
 
-## Playgrounds
-timeline.xctimeline
-playground.xcworkspace
+# Editor
+.vscode/
+!.vscode/mcp.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
 
-# Swift Package Manager
-#
-# Add this line if you want to avoid checking in source code from Swift Package Manager dependencies.
-# Packages/
-# Package.pins
-# Package.resolved
-# *.xcodeproj
-#
-# Xcode automatically generates this directory with a .xcworkspacedata file and xcuserdata
-# hence it is not needed unless you have added a package configuration file to your project
-# .swiftpm
+# Testing artifacts
+playwright-report/
+playwright-report-*.zip
+test-results/
+.auth/
 
+# Temporary files
+*.tmp
+*.temp
+temp-*
+
+# Swift
 .build/
+.swiftpm/
 
-# CocoaPods
-#
-# We recommend against adding the Pods directory to your .gitignore. However
-# you should judge for yourself, the pros and cons are mentioned at:
-# https://guides.cocoapods.org/using/using-cocoapods.html#should-i-check-the-pods-directory-into-source-control
-#
-# Pods/
-#
-# Add this line if you want to avoid checking in source code from the Xcode workspace
-# *.xcworkspace
+# Tooling
+.qodo/
+.playwright-mcp/
+.agents/
+skills-lock.json
 
-# Carthage
-#
-# Add this line if you want to avoid checking in source code from Carthage dependencies.
-# Carthage/Checkouts
-
-Carthage/Build/
-
-# fastlane
-#
-# It is recommended to not store the screenshots in the git repo.
-# Instead, use fastlane to re-generate the screenshots whenever they are needed.
-# For more information about the recommended setup visit:
-# https://docs.fastlane.tools/best-practices/source-control/#source-control
-
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
+# Prisma
+prisma/dev.db*

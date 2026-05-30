@@ -1,0 +1,33 @@
+{
+  "originHash" : "16e7e8eb2efa57ad3e437243a63665e2375ab5de66fa0d753ea6f3b64482aa9e",
+  "pins" : [
+    {
+      "identity" : "cocoalumberjack",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/CocoaLumberjack/CocoaLumberjack.git",
+      "state" : {
+        "revision" : "c5f2ed4d219866117e135cf648180dc7b66739d3",
+        "version" : "3.9.1"
+      }
+    },
+    {
+      "identity" : "rollbar-apple",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/rollbar/rollbar-apple",
+      "state" : {
+        "revision" : "e008574c10e9f0e6f88e69d749807fd92ca36172",
+        "version" : "3.4.0"
+      }
+    },
+    {
+      "identity" : "swift-log",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-log",
+      "state" : {
+        "revision" : "2aed77ae5ec9a86d8fe42c12275e4c2653a286ee",
+        "version" : "1.13.1"
+      }
+    }
+  ],
+  "version" : 3
+}
