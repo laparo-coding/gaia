@@ -1,6 +1,6 @@
 name: Deploy iPad Build
 
-on:
+"on":
   workflow_dispatch:
     inputs:
       release_tag:
@@ -11,19 +11,20 @@ on:
 jobs:
   deploy:
     runs-on: macos-15
-    environment: production
+    environment:
+      name: production
     env:
-      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-      IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
-      IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
-      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
-      IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
-      IOS_WORKSPACE: ${{ vars.IOS_WORKSPACE }}
-      IOS_PROJECT: ${{ vars.IOS_PROJECT }}
-      IOS_SCHEME: ${{ vars.IOS_SCHEME }}
-      IOS_CONFIGURATION: ${{ vars.IOS_CONFIGURATION }}
-      IOS_EXPORT_METHOD: ${{ vars.IOS_EXPORT_METHOD }}
+      IOS_TEAM_ID: ${{ secrets['IOS_TEAM_ID'] }}
+      IOS_BUNDLE_ID: ${{ secrets['IOS_BUNDLE_ID'] }}
+      IOS_CERTIFICATE_BASE64: ${{ secrets['IOS_CERTIFICATE_BASE64'] }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets['IOS_CERTIFICATE_PASSWORD'] }}
+      IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets['IOS_PROVISIONING_PROFILE_BASE64'] }}
+      IOS_KEYCHAIN_PASSWORD: ${{ secrets['IOS_KEYCHAIN_PASSWORD'] }}
+      IOS_WORKSPACE: ${{ vars['IOS_WORKSPACE'] }}
+      IOS_PROJECT: ${{ vars['IOS_PROJECT'] }}
+      IOS_SCHEME: ${{ vars['IOS_SCHEME'] }}
+      IOS_CONFIGURATION: ${{ vars['IOS_CONFIGURATION'] }}
+      IOS_EXPORT_METHOD: ${{ vars['IOS_EXPORT_METHOD'] }}
       IOS_ARCHIVE_PATH: ${{ github.workspace }}/artifacts/GaiaApp.xcarchive
       IOS_EXPORT_PATH: ${{ github.workspace }}/artifacts/export
     steps:

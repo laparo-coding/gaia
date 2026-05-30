@@ -1,6 +1,6 @@
 name: Gaia CI
 
-on:
+"on":
   pull_request:
     branches: [main]
   push:
@@ -31,9 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: quality
     steps:
-        # Intentionally non-enforcing placeholder until a repository-level review
-        # policy command is implemented.
+      # Intentionally non-enforcing placeholder until a repository-level review
+      # policy command is implemented.
       - name: Enforce review gate placeholders
         run: |
-            echo "::notice title=PLACEHOLDER_REVIEW_GATE::Review gate is currently informational only (non-enforcing)."
-            echo "PLACEHOLDER_REVIEW_GATE"
+          echo "::notice title=PLACEHOLDER_REVIEW_GATE::Review gate is currently informational only (non-enforcing)."
+          echo "PLACEHOLDER_REVIEW_GATE"
