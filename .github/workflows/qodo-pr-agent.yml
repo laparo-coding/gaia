@@ -1,0 +1,39 @@
+name: "Bot: Qodo PR Agent"
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+jobs:
+  pr_agent_job:
+    concurrency:
+      group: qodo-pr-agent-${{ github.event.pull_request.number || github.event.issue.number || github.ref }}
+      cancel-in-progress: true
+    if: ${{ github.event.sender.type != 'Bot' && (github.event_name == 'pull_request' || github.event_name == 'pull_request_review' || github.event_name == 'pull_request_review_comment' || github.event.issue.pull_request) }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: write
+    name: Run PR Agent on every pull request, respond to user comments
+    steps:
+      # qodo-ai/pr-agent v0.34 pinned to an immutable commit SHA.
+      - name: PR Agent action step
+        id: pragent
+        uses: qodo-ai/pr-agent@d82f7d3e696cd00822694aaa3096265d3889f3f1
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "true"
+          github_action_config.auto_update_changelog: "false"
+          github_action_config.auto_questions: "false"
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "review_requested"]'
+          pr_reviewer.extra_instructions: "Focus on Swift type safety, actor/concurrency correctness, SwiftPM packaging, GitHub Actions safety, and specs-first compliance in specs/* and docs/ops/*."
