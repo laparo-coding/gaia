@@ -84,29 +84,31 @@ check_feature_branch() {
 get_feature_dir() { echo "$1/specs/$2"; }
 
 get_feature_paths() {
-    local repo_root=$(get_repo_root)
-    local current_branch=$(get_current_branch)
+    local repo_root
+    local current_branch
     local has_git_repo="false"
+    local feature_dir
+
+    repo_root=$(get_repo_root)
+    current_branch=$(get_current_branch)
     
     if has_git; then
         has_git_repo="true"
     fi
     
-    local feature_dir=$(get_feature_dir "$repo_root" "$current_branch")
-    
-    cat <<EOF
-REPO_ROOT='$repo_root'
-CURRENT_BRANCH='$current_branch'
-HAS_GIT='$has_git_repo'
-FEATURE_DIR='$feature_dir'
-FEATURE_SPEC='$feature_dir/spec.md'
-IMPL_PLAN='$feature_dir/plan.md'
-TASKS='$feature_dir/tasks.md'
-RESEARCH='$feature_dir/research.md'
-DATA_MODEL='$feature_dir/data-model.md'
-QUICKSTART='$feature_dir/quickstart.md'
-CONTRACTS_DIR='$feature_dir/contracts'
-EOF
+    feature_dir=$(get_feature_dir "$repo_root" "$current_branch")
+
+    printf 'REPO_ROOT=%q\n' "$repo_root"
+    printf 'CURRENT_BRANCH=%q\n' "$current_branch"
+    printf 'HAS_GIT=%q\n' "$has_git_repo"
+    printf 'FEATURE_DIR=%q\n' "$feature_dir"
+    printf 'FEATURE_SPEC=%q\n' "$feature_dir/spec.md"
+    printf 'IMPL_PLAN=%q\n' "$feature_dir/plan.md"
+    printf 'TASKS=%q\n' "$feature_dir/tasks.md"
+    printf 'RESEARCH=%q\n' "$feature_dir/research.md"
+    printf 'DATA_MODEL=%q\n' "$feature_dir/data-model.md"
+    printf 'QUICKSTART=%q\n' "$feature_dir/quickstart.md"
+    printf 'CONTRACTS_DIR=%q\n' "$feature_dir/contracts"
 }
 
 check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
