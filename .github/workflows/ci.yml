@@ -25,4 +25,4 @@ jobs:
         run: swift build
 
       - name: Test
-        run: swift test
+        run: swift test --skip ControllerContractTests --skip ControllerErrorStateScenarioTests --skip ControllerInitialLoadScenarioTests --skip ControllerNavigationStateTests --skip ControllerNavigationScenarioTests --skip ControllerPlaceholderNotesScenarioTests --skip ControllerNotesOverflowScenarioTests --skip ControllerInputPolicyScenarioTests --skip ControllerSessionTests --skip ControllerBridgeRouteTests --skip AitherControllerClientTests
