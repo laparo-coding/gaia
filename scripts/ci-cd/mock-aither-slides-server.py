@@ -42,7 +42,7 @@ state_lock = threading.Lock()
 
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
+    def log_message(self, format_, *args):
         return
 
     def _send_json(self, payload: dict, status: int = 200):

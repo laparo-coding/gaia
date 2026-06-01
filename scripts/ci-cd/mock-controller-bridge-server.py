@@ -60,7 +60,7 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def log_message(self, fmt, *args):
+    def log_message(self, format_, *args):
         return
 
     def do_GET(self):
