@@ -66,17 +66,19 @@ enum ControllerNavigationRoute {
       return AuthenticationRouteResponse(statusCode: 502, body: nil)
     }
 
+    let activeSlide = manifest.slides[manifest.activeSlideIndex]
+
     return AuthenticationRouteResponse(
       statusCode: 200,
       body: ControllerNavigationResultPayload(
         activeSlideIndex: manifest.activeSlideIndex,
         slide: ControllerNavigationResultPayload.SlidePayload(
-          index: manifest.activeSlide.index,
-          fileName: manifest.activeSlide.fileName,
-          htmlURL: manifest.activeSlide.htmlURL.absoluteString,
-          notes: manifest.activeSlide.notes,
-          notesSource: manifest.activeSlide.notesSource.rawValue,
-          title: manifest.activeSlide.title
+          index: activeSlide.index,
+          fileName: activeSlide.fileName,
+          htmlURL: activeSlide.htmlURL.absoluteString,
+          notes: activeSlide.notes,
+          notesSource: activeSlide.notesSource.rawValue,
+          title: activeSlide.title
         )
       )
     )
