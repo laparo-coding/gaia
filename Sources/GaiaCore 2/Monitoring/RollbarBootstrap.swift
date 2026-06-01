@@ -108,8 +108,9 @@ public enum RollbarBootstrap {
     }
 
     for key in ["GAIA_ENV", "ROLLBAR_ENVIRONMENT", "ENVIRONMENT"] {
-      guard let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        .lowercased(), !value.isEmpty
+      guard
+        let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
+          .lowercased(), !value.isEmpty
       else {
         continue
       }
@@ -146,8 +147,9 @@ public enum RollbarBootstrap {
     environment: [String: String]
   ) -> Bool {
     for key in ["GAIA_ROLLBAR_DIAGNOSTICS", "ROLLBAR_DIAGNOSTICS"] {
-      guard let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
-        .lowercased(), !value.isEmpty
+      guard
+        let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
+          .lowercased(), !value.isEmpty
       else {
         continue
       }

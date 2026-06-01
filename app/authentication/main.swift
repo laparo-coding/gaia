@@ -1,7 +1,7 @@
+import Darwin
 import Foundation
 import GaiaCore
 import Network
-import Darwin
 
 private let environment = LocalEnvironment.mergedWithProcessEnvironment(
   currentDirectoryPath: FileManager.default.currentDirectoryPath,
@@ -68,7 +68,8 @@ private struct AuthenticationAppConfiguration {
       self.baseURL = baseURL
     }
 
-    if let aitherBaseURLString = environment["GAIA_AITHER_BASE_URL"] ?? environment["AITHER_BASE_URL"],
+    if let aitherBaseURLString = environment["GAIA_AITHER_BASE_URL"]
+      ?? environment["AITHER_BASE_URL"],
       let aitherBaseURL = URL(string: aitherBaseURLString)
     {
       self.aitherBaseURL = aitherBaseURL
@@ -79,7 +80,9 @@ private struct AuthenticationAppConfiguration {
       self.aitherBaseURL = defaultAitherBaseURL
     }
 
-    if let configuredCourseID = environment["GAIA_CONTROLLER_COURSE_ID"], !configuredCourseID.isEmpty {
+    if let configuredCourseID = environment["GAIA_CONTROLLER_COURSE_ID"],
+      !configuredCourseID.isEmpty
+    {
       controllerDefaultCourseID = configuredCourseID
     } else {
       controllerDefaultCourseID = "course-123"
@@ -207,7 +210,9 @@ private struct AuthenticationAppConfiguration {
     }
   }
 
-  private static func resolveRuntimeEnvironment(from environment: [String: String]) -> RuntimeEnvironment {
+  private static func resolveRuntimeEnvironment(from environment: [String: String])
+    -> RuntimeEnvironment
+  {
     if environment["XCTestConfigurationFilePath"] != nil || environment["GAIA_TEST"] == "1" {
       return .test
     }
@@ -515,7 +520,8 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
     case ("POST", ControllerNavigationRoute.path):
-      guard let payload = try? decoder.decode(ControllerNavigationPayload.self, from: request.body) else {
+      guard let payload = try? decoder.decode(ControllerNavigationPayload.self, from: request.body)
+      else {
         return makeJSONResponse(
           statusCode: 400,
           body: AuthenticationErrorPayload(
@@ -673,7 +679,9 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       let components = URLComponents(string: path)
     {
       let resolvedPath = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
-      return (path: resolvedPath, queryItems: parseQueryItems(from: components.percentEncodedQuery ?? ""))
+      return (
+        path: resolvedPath, queryItems: parseQueryItems(from: components.percentEncodedQuery ?? "")
+      )
     }
 
     let segments = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)

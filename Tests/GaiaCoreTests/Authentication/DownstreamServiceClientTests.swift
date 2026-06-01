@@ -109,12 +109,16 @@ struct DownstreamServiceClientTests {
     )
 
     let client = DownstreamServiceClient(runtime: runtime) { request in
-      let components = try #require(URLComponents(url: request.url!, resolvingAgainstBaseURL: false))
-      #expect(components.queryItems == [
-        URLQueryItem(name: "courseId", value: "course-123"),
-        URLQueryItem(name: "filter", value: "slide notes")
-      ])
-      #expect(request.url?.absoluteString == "http://localhost:3500/api/sync?courseId=course-123&filter=slide%20notes")
+      let components = try #require(
+        URLComponents(url: request.url!, resolvingAgainstBaseURL: false))
+      #expect(
+        components.queryItems == [
+          URLQueryItem(name: "courseId", value: "course-123"),
+          URLQueryItem(name: "filter", value: "slide notes"),
+        ])
+      #expect(
+        request.url?.absoluteString
+          == "http://localhost:3500/api/sync?courseId=course-123&filter=slide%20notes")
 
       let url = try #require(request.url)
       let response = try #require(
