@@ -15,6 +15,14 @@ Deployment requires all of the following:
 - automated review gate passed
 - zero unresolved blocking comments
 
+## Automated Reviewers
+
+- Qodo is enabled via the installed Qodo GitHub App.
+- CodeRabbit is enabled via the installed CodeRabbit GitHub App; repository behavior is configured in `.coderabbit.yaml`.
+- Codacy is enabled via the installed Codacy GitHub App and repository integration settings in Codacy.
+
+All automated reviewers are app-based and do not require repository-hosted bot workflows.
+
 ## Merge and Deploy Rules
 
 - Merge remains blocked while any required CI gate is failing.

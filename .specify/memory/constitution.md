@@ -1,15 +1,13 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 0.0.0 -> 1.0.0
-  Amendment date: 2026-05-29
-  Amendment type: MAJOR
+  Version change: 1.1.0 -> 1.2.0
+  Amendment date: 2026-05-31
+  Amendment type: MINOR
 
   Summary:
-  - Replaced an incorrect copied constitution with a Gaia-specific baseline
-  - Established a VS Code-first Swift project constitution
-  - Preserved relevant Aither principles: test-first work, machine-enforced
-    quality, spec-first delivery, security discipline, and observability
+  - Updated product requirement: Gaia app targets iPad in landscape mode only
+  - Explicitly states portrait mode support is not required
 
   Follow-up:
   - Align repository tooling with this constitution as Swift-specific files are
@@ -122,6 +120,7 @@ Gaia favors small, explicit, machine-checked building blocks.
   approved.
 - Developer-facing documentation MUST be kept close to the code: README,
   DocC, architecture notes, and spec artifacts must agree.
+- All Markdown documents MUST be written in English.
 - Naming, file organization, and package structure MUST optimize comprehension
   for the next maintainer, not local convenience for the current author.
 
@@ -169,6 +168,14 @@ Apple-platform app folders, resources, or project metadata MAY exist when the
 product requires them, but they must not become an excuse to hide core logic in
 editor-specific or IDE-only structures.
 
+### Device and Orientation Scope
+
+- The Gaia app MUST run on iPad in landscape mode.
+- Portrait mode support is explicitly out of scope and MUST NOT be treated as a
+  release blocker.
+- Any UI, layout, and interaction acceptance criteria for app features MUST be
+  validated against iPad landscape behavior first.
+
 ### Quality Gates
 
 Every pull request MUST satisfy the smallest applicable executable checks before
@@ -205,4 +212,4 @@ closely enough that a contributor can reproduce failures inside VS Code.
 - If a repository practice conflicts with this constitution, the constitution
   wins until the conflict is resolved in writing.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-05-29
+**Version**: 1.2.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-05-31
