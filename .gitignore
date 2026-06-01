@@ -46,10 +46,15 @@ test-results/
 *.tmp
 *.temp
 temp-*
+*.swp
+Thumbs.db
 
 # Swift
 .build/
 .swiftpm/
+*.swiftpm/
+DerivedData/
+Packages/
 
 # Tooling
 .qodo/
@@ -59,3 +64,7 @@ skills-lock.json
 
 # Prisma
 prisma/dev.db*
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md

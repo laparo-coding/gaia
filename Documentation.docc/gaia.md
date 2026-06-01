@@ -31,3 +31,14 @@ Gaia is a VS Code-first Swift project baseline with a Speckit workflow.
 	shell that can be run from SwiftPM for development-time validation.
 - Service-to-service requests use server-side Bearer credentials sourced from
 	environment variables or secrets, never an interactive user session token.
+
+## Controller Design Scaffold (007)
+
+- `Sources/GaiaCore/Controller/` provides initial controller session/manifest
+	models, slide/navigation types, bridge orchestration, and telemetry.
+- `app/controller/` provides the iPad-focused SwiftUI scaffold (root split view,
+	WebKit slide viewport, notes panel, status overlay, and controller view model).
+- `app/controller-bridge/` provides initial route handlers for presentation and
+	navigation bridge calls.
+- `Tests/GaiaCoreTests/Controller/` holds red-phase tests that are expected to
+	fail until full controller behavior is completed.

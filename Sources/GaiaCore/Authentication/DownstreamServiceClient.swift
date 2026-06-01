@@ -100,8 +100,34 @@ public struct DownstreamServiceClient: Sendable {
     additionalHeaders: [String: String]
   ) throws -> URLRequest {
     let base = normalizedBaseURL(baseURL)
-    let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-    let url = relativePath.isEmpty ? base : base.appendingPathComponent(relativePath)
+    let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+    let routePath: String
+    let routeQuery: String?
+    if let querySeparator = trimmedPath.firstIndex(of: "?") {
+      routePath = String(trimmedPath[..<querySeparator])
+      let queryStart = trimmedPath.index(after: querySeparator)
+      routeQuery = queryStart < trimmedPath.endIndex ? String(trimmedPath[queryStart...]) : nil
+    } else {
+      routePath = trimmedPath
+      routeQuery = nil
+    }
+
+    let routeURL = routePath.isEmpty ? base : base.appendingPathComponent(routePath)
+    let url: URL
+    if let routeQuery, !routeQuery.isEmpty {
+      guard var components = URLComponents(url: routeURL, resolvingAgainstBaseURL: false) else {
+        throw AuthenticationError.unsafeFailure(reason: "invalid_downstream_url")
+      }
+      components.queryItems = URLQueryCodec.queryItems(fromPercentEncodedQuery: routeQuery)
+      guard let composedURL = components.url else {
+        throw AuthenticationError.unsafeFailure(reason: "invalid_downstream_url")
+      }
+      url = composedURL
+    } else {
+      url = routeURL
+    }
+
     guard url.scheme != nil else {
       throw AuthenticationError.unsafeFailure(reason: "invalid_downstream_url")
     }
@@ -149,4 +175,5 @@ public struct DownstreamServiceClient: Sendable {
     }
     return headers
   }
+
 }

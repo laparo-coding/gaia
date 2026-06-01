@@ -26,14 +26,3 @@ jobs:
 
       - name: Test
         run: swift test
-
-  review-gates:
-    runs-on: ubuntu-latest
-    needs: quality
-    steps:
-      # Intentionally non-enforcing placeholder until a repository-level review
-      # policy command is implemented.
-      - name: Enforce review gate placeholders
-        run: |
-          echo "::notice title=PLACEHOLDER_REVIEW_GATE::Review gate is currently informational only (non-enforcing)."
-          echo "PLACEHOLDER_REVIEW_GATE"

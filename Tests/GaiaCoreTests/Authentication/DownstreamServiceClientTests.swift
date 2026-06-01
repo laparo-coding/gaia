@@ -95,6 +95,54 @@ struct DownstreamServiceClientTests {
     #expect(result.error == nil)
   }
 
+  @Test
+  func downstreamRequestsBuildQueryFromQueryItems() async throws {
+    let runtime = try makeRuntime(
+      hemeraTokens: [],
+      aitherTokens: [
+        LoadedServiceToken(
+          token: "aither-sync-token",
+          expiresAt: AuthTestSupport.expiresAt,
+          refreshedAt: AuthTestSupport.issuedAt
+        )
+      ]
+    )
+
+    let client = DownstreamServiceClient(runtime: runtime) { request in
+      let components = try #require(URLComponents(url: request.url!, resolvingAgainstBaseURL: false))
+      #expect(components.queryItems == [
+        URLQueryItem(name: "courseId", value: "course-123"),
+        URLQueryItem(name: "filter", value: "slide notes")
+      ])
+      #expect(request.url?.absoluteString == "http://localhost:3500/api/sync?courseId=course-123&filter=slide%20notes")
+
+      let url = try #require(request.url)
+      let response = try #require(
+        HTTPURLResponse(
+          url: url,
+          statusCode: 200,
+          httpVersion: nil,
+          headerFields: ["Content-Type": "application/json"]
+        )
+      )
+      return (Data("{}".utf8), response)
+    }
+
+    let result = await client.send(
+      service: .aither,
+      baseURL: URL(string: "http://localhost:3500")!,
+      path: "/api/sync?courseId=course-123&filter=slide%20notes",
+      method: "GET",
+      operation: "trigger-sync",
+      requestId: AuthTestSupport.requestId,
+      now: AuthTestSupport.issuedAt
+    )
+
+    #expect(result.value?.statusCode == 200)
+    #expect(result.authorization?.status == .authorized)
+    #expect(result.error == nil)
+  }
+
   private func makeRuntime(
     hemeraTokens: [LoadedServiceToken],
     aitherTokens: [LoadedServiceToken]

@@ -71,6 +71,21 @@ with Command Line Tools alone; SwiftPM tests may require the full Xcode SDK.
 	Aither, short-lived cache entries, and a single refresh-and-retry cycle on
 	downstream expiry.
 
+## Controller Design Scaffold (007)
+
+- `Sources/GaiaCore/Controller/` now contains the first controller domain models,
+	Aither client integration, bridge orchestration, and controller telemetry.
+- `app/controller/` now contains a SwiftUI iPad controller scaffold with split
+	layout, WebKit viewport wrapper, notes panel, status overlay, and a bridge
+	facing view model.
+- `app/controller-bridge/` now contains initial presentation/navigation route
+	handlers that call into `ControllerBridgeService`.
+- `Tests/GaiaCoreTests/Controller/` now contains red-phase controller tests that
+	intentionally fail as part of strict TDD sequencing.
+- For iPad build validation, use
+	`scripts/ci-cd/validate-controller-ipad-build.sh` with project/scheme env
+	overrides when required.
+
 ## Recommended VS Code Extensions
 
 - `swiftlang.swift-vscode`

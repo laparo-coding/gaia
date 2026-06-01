@@ -1,0 +1,16 @@
+language: en-US
+tone_instructions: >-
+  Focus on Swift type safety, actor/concurrency correctness, SwiftPM packaging,
+  GitHub Actions safety, and specs-first compliance in specs/* and docs/ops/*.
+
+reviews:
+  profile: assertive
+  high_level_summary: true
+  high_level_summary_in_walkthrough: true
+  review_status: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: false
+  suggested_labels: false
+  suggested_reviewers: false
+  poem: false

@@ -1,6 +1,7 @@
 import Foundation
 import GaiaCore
 import Network
+import Darwin
 
 private let environment = LocalEnvironment.mergedWithProcessEnvironment(
   currentDirectoryPath: FileManager.default.currentDirectoryPath,
@@ -15,14 +16,25 @@ private let configuration = try AuthenticationAppConfiguration(
   environment: environment
 )
 private let runtime = try configuration.makeRuntime()
+try await configuration.seedDevelopmentSessionIfNeeded(runtime: runtime)
 private let server = try AuthenticationHTTPServer(configuration: configuration, runtime: runtime)
 
 try server.start()
 
 private struct AuthenticationAppConfiguration {
+  private enum RuntimeEnvironment {
+    case development
+    case test
+    case production
+  }
+
   let host: String
   let port: UInt16
   let baseURL: URL
+  let aitherBaseURL: URL
+  let controllerDefaultCourseID: String
+  let seedControllerDevelopmentSession: Bool
+  private let runtimeEnvironment: RuntimeEnvironment
   let hemeraToken: String?
   let aitherToken: String?
 
@@ -55,6 +67,28 @@ private struct AuthenticationAppConfiguration {
       }
       self.baseURL = baseURL
     }
+
+    if let aitherBaseURLString = environment["GAIA_AITHER_BASE_URL"] ?? environment["AITHER_BASE_URL"],
+      let aitherBaseURL = URL(string: aitherBaseURLString)
+    {
+      self.aitherBaseURL = aitherBaseURL
+    } else {
+      guard let defaultAitherBaseURL = URL(string: "http://127.0.0.1:3000") else {
+        throw AuthenticationError.unsafeFailure(reason: "invalid_aither_base_url")
+      }
+      self.aitherBaseURL = defaultAitherBaseURL
+    }
+
+    if let configuredCourseID = environment["GAIA_CONTROLLER_COURSE_ID"], !configuredCourseID.isEmpty {
+      controllerDefaultCourseID = configuredCourseID
+    } else {
+      controllerDefaultCourseID = "course-123"
+    }
+
+    seedControllerDevelopmentSession = Self.parseBooleanEnvironmentValue(
+      environment["GAIA_SEED_CONTROLLER_DEV_SESSION"]
+    )
+    runtimeEnvironment = Self.resolveRuntimeEnvironment(from: environment)
 
     hemeraToken = environment["HEMERA_SERVICE_API_KEY"] ?? environment["HEMERA_SERVICE_TOKEN"]
     aitherToken = environment["AITHER_SYNC_TOKEN"] ?? environment["AITHER_SERVICE_TOKEN"]
@@ -111,6 +145,37 @@ private struct AuthenticationAppConfiguration {
     )
   }
 
+  func seedDevelopmentSessionIfNeeded(runtime: AuthenticationRuntime) async throws {
+    guard seedControllerDevelopmentSession else {
+      return
+    }
+
+    guard runtimeEnvironment != .production else {
+      fputs(
+        "Ignoring GAIA_SEED_CONTROLLER_DEV_SESSION in production runtime.\n",
+        stderr
+      )
+      return
+    }
+
+    guard Self.isLoopbackHost(host), Self.isLoopbackHost(baseURL.host) else {
+      fputs(
+        "Ignoring GAIA_SEED_CONTROLLER_DEV_SESSION because host/base URL is not loopback-only.\n",
+        stderr
+      )
+      return
+    }
+
+    let now = Date()
+    _ = try await runtime.completeSignIn(
+      sessionId: "local-controller-dev-session",
+      subjectId: "local-controller-dev-user",
+      role: "developer",
+      issuedAt: now,
+      expiresAt: now.addingTimeInterval(8 * 60 * 60)
+    )
+  }
+
   private func makeTokenProvider(
     service: DownstreamService,
     configuredToken: String?
@@ -128,21 +193,103 @@ private struct AuthenticationAppConfiguration {
       )
     }
   }
+
+  private static func parseBooleanEnvironmentValue(_ value: String?) -> Bool {
+    guard let value else {
+      return false
+    }
+
+    switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+    case "1", "true", "yes", "on":
+      return true
+    default:
+      return false
+    }
+  }
+
+  private static func resolveRuntimeEnvironment(from environment: [String: String]) -> RuntimeEnvironment {
+    if environment["XCTestConfigurationFilePath"] != nil || environment["GAIA_TEST"] == "1" {
+      return .test
+    }
+
+    for key in ["GAIA_ENV", "ROLLBAR_ENVIRONMENT", "ENVIRONMENT"] {
+      guard
+        let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
+          .lowercased(),
+        !value.isEmpty
+      else {
+        continue
+      }
+
+      switch value {
+      case "dev", "development", "local":
+        return .development
+      case "test", "testing":
+        return .test
+      case "prod", "production":
+        return .production
+      default:
+        continue
+      }
+    }
+
+    #if DEBUG
+      return .development
+    #else
+      return .production
+    #endif
+  }
+
+  private static func isLoopbackHost(_ host: String?) -> Bool {
+    guard let host = host?.lowercased() else {
+      return false
+    }
+
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
+      return true
+    }
+
+    var address = in_addr()
+    guard inet_pton(AF_INET, host, &address) == 1 else {
+      return false
+    }
+
+    let ipv4HostOrder = UInt32(bigEndian: address.s_addr)
+    return (ipv4HostOrder & 0xFF00_0000) == 0x7F00_0000
+  }
 }
 
 private final class AuthenticationHTTPServer: @unchecked Sendable {
   private static let maxRequestBufferBytes = 1_048_576
+  private static let shutdownSignals: [Int32] = [SIGINT, SIGTERM]
 
   private let configuration: AuthenticationAppConfiguration
   private let runtime: AuthenticationRuntime
+  private let controllerBridgeService: ControllerBridgeService
+  private let controllerDefaultCourseID: String
   private let listener: NWListener
   private let queue = DispatchQueue(label: "gaia.authentication.http")
   private let encoder = JSONEncoder()
   private let decoder = JSONDecoder()
+  private let shutdownGroup = DispatchGroup()
+  private let shutdownStateQueue = DispatchQueue(label: "gaia.authentication.shutdown")
+  private var signalSources: [DispatchSourceSignal] = []
+  private var didSignalShutdown = false
 
   init(configuration: AuthenticationAppConfiguration, runtime: AuthenticationRuntime) throws {
     self.configuration = configuration
     self.runtime = runtime
+    let downstreamServiceClient = DownstreamServiceClient(runtime: runtime)
+    let controllerClient = AitherControllerClient(
+      bridgeBaseURL: configuration.baseURL,
+      aitherBaseURL: configuration.aitherBaseURL,
+      serviceClient: downstreamServiceClient
+    )
+    controllerBridgeService = ControllerBridgeService(
+      client: controllerClient,
+      telemetry: ControllerTelemetry()
+    )
+    controllerDefaultCourseID = configuration.controllerDefaultCourseID
     guard let nwPort = NWEndpoint.Port(rawValue: configuration.port) else {
       throw AuthenticationError.unsafeFailure(reason: "invalid_listener_port")
     }
@@ -157,9 +304,23 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
   }
 
   func start() throws {
-    listener.stateUpdateHandler = { state in
-      if case .failed(let error) = state {
+    shutdownGroup.enter()
+    installSignalHandlers()
+
+    listener.stateUpdateHandler = { [weak self] state in
+      guard let self else {
+        return
+      }
+
+      switch state {
+      case .failed(let error):
         fputs("GaiaAuthenticationApp listener failed: \(error)\n", stderr)
+        self.listener.cancel()
+        self.completeShutdownIfNeeded()
+      case .cancelled:
+        self.completeShutdownIfNeeded()
+      default:
+        break
       }
     }
 
@@ -169,7 +330,31 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
     listener.start(queue: queue)
 
     print("GaiaAuthenticationApp listening on \(configuration.baseURL.absoluteString)")
-    dispatchMain()
+    shutdownGroup.wait()
+  }
+
+  private func installSignalHandlers() {
+    signalSources = Self.shutdownSignals.map { shutdownSignal in
+      signal(shutdownSignal, SIG_IGN)
+      let source = DispatchSource.makeSignalSource(signal: shutdownSignal, queue: queue)
+      source.setEventHandler { [weak self] in
+        fputs("GaiaAuthenticationApp shutting down after signal \(shutdownSignal).\n", stderr)
+        self?.listener.cancel()
+        self?.completeShutdownIfNeeded()
+      }
+      source.resume()
+      return source
+    }
+  }
+
+  private func completeShutdownIfNeeded() {
+    shutdownStateQueue.sync {
+      guard !didSignalShutdown else {
+        return
+      }
+      didSignalShutdown = true
+      shutdownGroup.leave()
+    }
   }
 
   private func handle(connection: NWConnection) {
@@ -223,8 +408,25 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
 
   private func makeResponse(for request: HTTPRequest) async -> Data {
     let requestId = request.headers["x-request-id"] ?? UUID().uuidString
+    let parsedRequest = parseRouteRequest(path: request.path)
+    let routePath = parsedRequest.path
+    let queryItems = parsedRequest.queryItems
 
-    switch (request.method, request.path) {
+    if requiresControllerAuthorization(for: routePath) {
+      let session = await runtime.readSession()
+      guard isAuthorizedControllerSession(session) else {
+        return makeJSONResponse(
+          statusCode: 401,
+          body: AuthenticationErrorPayload(
+            error: "no_active_session",
+            message: "Controller routes require an active authenticated session.",
+            requestId: requestId
+          )
+        )
+      }
+    }
+
+    switch (request.method, routePath) {
     case ("GET", AuthenticationPage.path):
       let session = await runtime.readSession()
       return makeHTMLResponse(statusCode: 200, body: renderPage(for: session))
@@ -293,7 +495,80 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       )
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
+    case ("GET", ControllerPresentationRoute.path):
+      guard let courseID = validatedControllerCourseID(from: queryItems["courseId"]) else {
+        return makeJSONResponse(
+          statusCode: 400,
+          body: AuthenticationErrorPayload(
+            error: "invalid_request",
+            message: "courseId is invalid.",
+            requestId: requestId
+          )
+        )
+      }
+
+      let response = await ControllerPresentationRoute.get(
+        bridgeService: controllerBridgeService,
+        courseID: courseID,
+        requestID: requestId
+      )
+      return makeJSONResponse(statusCode: response.statusCode, body: response.body)
+
+    case ("POST", ControllerNavigationRoute.path):
+      guard let payload = try? decoder.decode(ControllerNavigationPayload.self, from: request.body) else {
+        return makeJSONResponse(
+          statusCode: 400,
+          body: AuthenticationErrorPayload(
+            error: "invalid_request",
+            message: "Controller navigation payload could not be decoded.",
+            requestId: requestId
+          )
+        )
+      }
+
+      guard let courseID = validatedControllerCourseID(from: queryItems["courseId"]) else {
+        return makeJSONResponse(
+          statusCode: 400,
+          body: AuthenticationErrorPayload(
+            error: "invalid_request",
+            message: "courseId is invalid.",
+            requestId: requestId
+          )
+        )
+      }
+
+      let response = await ControllerNavigationRoute.post(
+        bridgeService: controllerBridgeService,
+        courseID: courseID,
+        payload: payload,
+        requestID: requestId
+      )
+      return makeJSONResponse(statusCode: response.statusCode, body: response.body)
+
     default:
+      if request.method == "GET",
+        let fileName = ControllerSlidesRoute.fileName(from: routePath)
+      {
+        guard let courseID = validatedControllerCourseID(from: queryItems["courseId"]) else {
+          return makeJSONResponse(
+            statusCode: 400,
+            body: AuthenticationErrorPayload(
+              error: "invalid_request",
+              message: "courseId is invalid.",
+              requestId: requestId
+            )
+          )
+        }
+
+        let response = await ControllerSlidesRoute.get(
+          bridgeService: controllerBridgeService,
+          courseID: courseID,
+          fileName: fileName,
+          requestID: requestId
+        )
+        return makeControllerSlidesResponse(response)
+      }
+
       return makeJSONResponse(
         statusCode: 404,
         body: AuthenticationErrorPayload(
@@ -391,6 +666,77 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       headers: headers,
       body: body
     )
+  }
+
+  private func parseRouteRequest(path: String) -> (path: String, queryItems: [String: String]) {
+    if path.hasPrefix("http://") || path.hasPrefix("https://"),
+      let components = URLComponents(string: path)
+    {
+      let resolvedPath = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+      return (path: resolvedPath, queryItems: parseQueryItems(from: components.percentEncodedQuery ?? ""))
+    }
+
+    let segments = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+    let rawPath = String(segments.first ?? "")
+    let rawQuery = segments.count > 1 ? String(segments[1]) : ""
+    let resolvedPath = rawPath.isEmpty ? "/" : rawPath
+
+    return (path: resolvedPath, queryItems: parseQueryItems(from: rawQuery))
+  }
+
+  private func parseQueryItems(from rawQuery: String) -> [String: String] {
+    URLQueryCodec.queryDictionary(fromPercentEncodedQuery: rawQuery)
+  }
+
+  private func validatedControllerCourseID(from queryCourseID: String?) -> String? {
+    let candidate = (queryCourseID ?? controllerDefaultCourseID)
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    guard !candidate.isEmpty, candidate.count <= 128 else {
+      return nil
+    }
+
+    guard candidate.range(of: "^[A-Za-z0-9._-]+$", options: .regularExpression) != nil else {
+      return nil
+    }
+
+    return candidate
+  }
+
+  private func requiresControllerAuthorization(for path: String) -> Bool {
+    path.hasPrefix("/api/controller/")
+  }
+
+  private func isAuthorizedControllerSession(_ session: RuntimeSessionState) -> Bool {
+    guard session.status == .authenticated else {
+      return false
+    }
+
+    guard let expiresAt = session.expiresAt else {
+      return false
+    }
+
+    return expiresAt > Date()
+  }
+
+  private func makeControllerSlidesResponse(
+    _ response: AuthenticationRouteResponse<ControllerSlidesRouteBody>
+  ) -> Data {
+    switch response.body {
+    case .html(let html):
+      return makeHTMLResponse(statusCode: response.statusCode, body: html)
+    case .error(let payload):
+      return makeJSONResponse(statusCode: response.statusCode, body: payload)
+    case nil:
+      return makeJSONResponse(
+        statusCode: response.statusCode,
+        body: AuthenticationErrorPayload(
+          error: "controller_slide_failed",
+          message: "Controller slide could not be loaded.",
+          requestId: nil
+        )
+      )
+    }
   }
 
   private func renderPage(for session: RuntimeSessionState) -> String {
