@@ -14,3 +14,8 @@
 - Schreibe Unit-Tests mit XCTest oder Swift Testing und halte den Repo-Standard pro Target konsistent.
 - Lege neue produktive Swift-Quellen unter `Sources/` und Tests unter `Tests/` an.
 - Behandle bestehende Web- oder Prototyp-Strukturen unter `legacy/` als archiviert, außer ein Task verlangt explizit Arbeit daran.
+
+## Caveman Mode
+
+- Referenz: `.github/caveman-mode.md`.
+
