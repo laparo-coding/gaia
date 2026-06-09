@@ -367,9 +367,14 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
     receive(on: connection, buffer: Data())
   }
 
+  private var streamingConnections: [ObjectIdentifier: NWConnection] = [:]
+  private let streamingConnectionsLock = NSLock()
+  private var pumpTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
+  private let pumpTasksLock = NSLock()
+
   private func receive(on connection: NWConnection, buffer: Data) {
     connection.receive(minimumIncompleteLength: 1, maximumLength: 65_536) {
-      [weak self] data, _, _, error in
+      [weak self] data, _, isComplete, error in
       guard let self else {
         connection.cancel()
         return
@@ -377,6 +382,13 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
 
       if let error {
         fputs("Receive error: \(error)\n", stderr)
+        self.removeStreamingConnection(connection)
+        connection.cancel()
+        return
+      }
+
+      if isComplete {
+        self.removeStreamingConnection(connection)
         connection.cancel()
         return
       }
@@ -391,6 +403,7 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
           "Request buffer exceeded \(Self.maxRequestBufferBytes) bytes; closing connection.\n",
           stderr
         )
+        self.removeStreamingConnection(connection)
         connection.cancel()
         return
       }
@@ -401,17 +414,21 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       }
 
       Task {
-        let response = await self.makeResponse(for: request)
+        let response = await self.makeResponse(for: request, on: connection)
+        guard let response else {
+          return
+        }
         connection.send(
           content: response,
           completion: .contentProcessed { _ in
+            self.removeStreamingConnection(connection)
             connection.cancel()
           })
       }
     }
   }
 
-  private func makeResponse(for request: HTTPRequest) async -> Data {
+  private func makeResponse(for request: HTTPRequest, on connection: NWConnection) async -> Data? {
     let requestId = request.headers["x-request-id"] ?? UUID().uuidString
     let parsedRequest = parseRouteRequest(path: request.path)
     let routePath = parsedRequest.path
@@ -551,6 +568,33 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       )
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
+    case ("GET", DashboardRouteHandlers.statusPath):
+      let response = DashboardRouteHandlers.getStatus(now: Date())
+      return makeJSONResponse(statusCode: response.statusCode, body: response.body)
+
+    case ("GET", DashboardRouteHandlers.participantsPath):
+      guard let courseID = validatedControllerCourseID(from: queryItems["courseId"]) else {
+        return makeJSONResponse(
+          statusCode: 400,
+          body: AuthenticationErrorPayload(
+            error: "invalid_request",
+            message: "courseId is invalid.",
+            requestId: requestId
+          )
+        )
+      }
+
+      let response = DashboardRouteHandlers.getParticipants(courseID: courseID)
+      return makeJSONResponse(statusCode: response.statusCode, body: response.body)
+
+    case ("GET", DashboardRouteHandlers.systemHealthPath):
+      let response = DashboardRouteHandlers.getSystemHealth(now: Date())
+      return makeJSONResponse(statusCode: response.statusCode, body: response.body)
+
+    case ("GET", DashboardRouteHandlers.statusEventsPath):
+      startStatusEventStream(connection: connection)
+      return nil
+
     default:
       if request.method == "GET",
         let fileName = ControllerSlidesRoute.fileName(from: routePath)
@@ -603,6 +647,207 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
     )
   }
 
+  private func makeEventStreamResponse(statusCode: Int, body: String) -> Data {
+    makeHTTPResponse(
+      statusCode: statusCode,
+      contentType: "text/event-stream; charset=utf-8",
+      body: Data(body.utf8)
+    )
+  }
+
+  private func makeSSEHeaders(statusCode: Int) -> Data {
+    let statusText: String
+    switch statusCode {
+    case 200: statusText = "OK"
+    case 204: statusText = "No Content"
+    case 400: statusText = "Bad Request"
+    case 401: statusText = "Unauthorized"
+    case 404: statusText = "Not Found"
+    case 503: statusText = "Service Unavailable"
+    case 502: statusText = "Bad Gateway"
+    default: statusText = "Internal Server Error"
+    }
+
+    var headers = "HTTP/1.1 \(statusCode) \(statusText)\r\n"
+    headers += "Content-Type: text/event-stream; charset=utf-8\r\n"
+    headers += "Cache-Control: no-cache\r\n"
+    headers += "X-Accel-Buffering: no\r\n"
+    headers += "Connection: keep-alive\r\n"
+    headers += "Transfer-Encoding: chunked\r\n"
+    headers += "\r\n"
+    return Data(headers.utf8)
+  }
+
+  private func registerStreamingConnection(_ connection: NWConnection) {
+    streamingConnectionsLock.lock()
+    streamingConnections[ObjectIdentifier(connection)] = connection
+    streamingConnectionsLock.unlock()
+  }
+
+  private func removeStreamingConnection(_ connection: NWConnection) {
+    streamingConnectionsLock.lock()
+    streamingConnections.removeValue(forKey: ObjectIdentifier(connection))
+    streamingConnectionsLock.unlock()
+  }
+
+  private func isStreamingConnection(_ connection: NWConnection) -> Bool {
+    streamingConnectionsLock.lock()
+    defer { streamingConnectionsLock.unlock() }
+    return streamingConnections[ObjectIdentifier(connection)] != nil
+  }
+
+  private func startStatusEventStream(connection: NWConnection) {
+    let key = ObjectIdentifier(connection)
+    streamingConnectionsLock.lock()
+    streamingConnections[key] = connection
+    streamingConnectionsLock.unlock()
+
+    let stream = DashboardRouteHandlers.getStatusEvents(
+      now: Date(),
+      isCancelled: { [weak self, weak connection] in
+        guard let self, let connection else { return true }
+        return !self.isStreamingConnection(connection)
+      }
+    )
+
+    let headers = makeSSEHeaders(statusCode: 200)
+    connection.send(
+      content: headers,
+      completion: .contentProcessed { [weak self] error in
+        guard let self else {
+          connection.cancel()
+          return
+        }
+
+        if let error {
+          fputs("SSE header send failed: \(error)\n", stderr)
+          self.removeStreamingConnection(connection)
+          connection.cancel()
+          return
+        }
+
+        guard self.isStreamingConnection(connection) else {
+          connection.cancel()
+          return
+        }
+
+        self.pumpStatusEventStream(connection: connection, stream: stream)
+      }
+    )
+  }
+
+  private func pumpStatusEventStream(
+    connection: NWConnection,
+    stream: AsyncStream<String>
+  ) {
+    let pumpTask = Task<Void, Never> { [weak self] in
+      await self?.runStatusEventPump(connection: connection, stream: stream)
+    }
+
+    pumpTasksLock.lock()
+    if let previous = pumpTasks[ObjectIdentifier(connection)] {
+      previous.cancel()
+    }
+    pumpTasks[ObjectIdentifier(connection)] = pumpTask
+    pumpTasksLock.unlock()
+  }
+
+  private func runStatusEventPump(
+    connection: NWConnection,
+    stream: AsyncStream<String>
+  ) async {
+    defer {
+      removeStreamingConnection(connection)
+      removePumpTask(for: connection)
+      Self.cancelConnection(connection)
+    }
+
+    for await chunk in stream {
+      if Task.isCancelled {
+        break
+      }
+
+      if !isStreamingConnection(connection) {
+        break
+      }
+
+      let framed = HTTPChunkedTransfer.encodeChunk(chunk)
+      let sendError: Error? = await withCheckedContinuation {
+        (continuation: CheckedContinuation<Error?, Never>) in
+        connection.send(
+          content: framed,
+          completion: .contentProcessed { error in
+            continuation.resume(returning: error)
+          }
+        )
+      }
+
+      if let sendError {
+        if Self.shouldLogSendError(sendError) {
+          fputs("SSE chunk send failed: \(sendError)\n", stderr)
+        }
+        break
+      }
+
+      if !isStreamingConnection(connection) {
+        break
+      }
+    }
+
+    if isStreamingConnection(connection) {
+      let sendError: Error? = await withCheckedContinuation {
+        (continuation: CheckedContinuation<Error?, Never>) in
+        connection.send(
+          content: HTTPChunkedTransfer.terminator(),
+          completion: .contentProcessed { error in
+            continuation.resume(returning: error)
+          }
+        )
+      }
+      if let sendError, Self.shouldLogSendError(sendError) {
+        fputs("SSE terminator send failed: \(sendError)\n", stderr)
+      }
+    }
+  }
+
+  /// POSIX 57 (ENOTCONN) / POSIX 32 (EPIPE) / NWConnection `.cancelled`
+  /// errors indicate the peer has gone away; they are part of the normal
+  /// shutdown handshake and should not pollute the log.
+  private static func shouldLogSendError(_ error: Error) -> Bool {
+    if let posix = error as? POSIXError {
+      switch posix.code {
+      case .ENOTCONN, .EPIPE, .ECANCELED:
+        return false
+      default:
+        return true
+      }
+    }
+    if let nwError = error as? NWError, nwError.debugDescription.contains("cancelled") {
+      return false
+    }
+    return true
+  }
+
+  private func removePumpTask(for connection: NWConnection) {
+    pumpTasksLock.lock()
+    pumpTasks.removeValue(forKey: ObjectIdentifier(connection))
+    pumpTasksLock.unlock()
+  }
+
+  private static func cancelConnection(_ connection: NWConnection) {
+    let state = connection.state
+    switch state {
+    case .cancelled, .failed:
+      return
+    default:
+      connection.cancel()
+    }
+  }
+
+  private static func encodeChunkedFrame(_ frame: String) -> Data {
+    HTTPChunkedTransfer.encodeChunk(frame)
+  }
+
   private func makeHTTPResponse(statusCode: Int, contentType: String, body: Data) -> Data {
     let statusText: String
     switch statusCode {
@@ -611,6 +856,7 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
     case 400: statusText = "Bad Request"
     case 401: statusText = "Unauthorized"
     case 404: statusText = "Not Found"
+    case 503: statusText = "Service Unavailable"
     case 502: statusText = "Bad Gateway"
     default: statusText = "Internal Server Error"
     }
@@ -712,7 +958,7 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
   }
 
   private func requiresControllerAuthorization(for path: String) -> Bool {
-    path.hasPrefix("/api/controller/")
+    path.hasPrefix("/api/controller/") || path.hasPrefix("/api/dashboard/")
   }
 
   private func isAuthorizedControllerSession(_ session: RuntimeSessionState) -> Bool {

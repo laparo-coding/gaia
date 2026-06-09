@@ -58,6 +58,18 @@ Additionally:
 - **Output:** ErrorProne issues, duplication metrics, complexity metrics, security (trivy)
 - **Config:** `.codacy/codacy.yaml` — tool enablement, runtime versions
 - **CLI:** `.codacy/cli.sh` — v2 binary management script
+- **Local standard-check policy (`scripts/ci-cd/codacy-standard-check.sh`):**
+   - Always runs `opengrep` for baseline static analysis on each selected path
+   - Adds `eslint` only for canonical JS/TS source roots
+     (`app/`, `web/`, `client/`, `frontend/`, `ui/`); Swift roots (`Sources/`,
+     `Tests/`) are excluded even if they contain JS/TS contract specs
+   - Adds `trivy` by default unless `--skip-trivy` is set
+   - Uses additive selection (not either/or) to keep coverage consistent across mixed-language changes
+   - Per-tool CLI invocations are sequential to bypass the Codacy CLI's
+     exclusive `--tool` handling, preserving deterministic order
+   - Configuration is loaded from `scripts/ci-cd/codacy-tools.conf`; the
+     script falls back to identical built-in defaults if the config is
+     missing, so policy drift between environments is impossible
 - **Blocking:** Required status check `Codacy Static Code Analysis`; must pass for merge
 
 ## Red-Phase Test Strategy

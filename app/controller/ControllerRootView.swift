@@ -2,9 +2,29 @@
 import SwiftUI
 
 struct ControllerRootView: View {
+  @StateObject private var dashboardViewModel = DashboardViewModel()
   @StateObject private var viewModel = ControllerViewModel()
+  @State private var isPresentingSlides = false
 
   var body: some View {
+    Group {
+      if isPresentingSlides {
+        presentationView
+      } else {
+        DashboardRootView(viewModel: dashboardViewModel) {
+          Task {
+            await viewModel.loadInitialPresentation()
+            isPresentingSlides = true
+          }
+        }
+        .task {
+          await dashboardViewModel.loadDashboard()
+        }
+      }
+    }
+  }
+
+  private var presentationView: some View {
     GeometryReader { proxy in
       let isWide = proxy.size.width >= proxy.size.height
       let horizontalPadding: CGFloat = 48
@@ -42,9 +62,6 @@ struct ControllerRootView: View {
         endPoint: .bottomTrailing
       )
     )
-    .task {
-      await viewModel.loadInitialPresentation()
-    }
     .overlay(alignment: .top) {
       ControllerStatusOverlay(status: viewModel.status)
         .padding(.top, 18)

@@ -13,6 +13,18 @@
 		A1B2C3D41AAA000100000004 /* ControllerViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000004 /* ControllerViewModel.swift */; };
 		A1B2C3D41AAA000100000005 /* SlideNotesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000005 /* SlideNotesView.swift */; };
 		A1B2C3D41AAA000100000006 /* SlideViewportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000006 /* SlideViewportView.swift */; };
+		A1B2C3D41AAA000100000007 /* DashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000007 /* DashboardViewModel.swift */; };
+		A1B2C3D41AAA000100000008 /* DashboardRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000008 /* DashboardRootView.swift */; };
+		A1B2C3D41AAA000100000009 /* ConnectionMonitorCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000009 /* ConnectionMonitorCard.swift */; };
+		A1B2C3D41AAA00010000000A /* ParticipantOverviewCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000A /* ParticipantOverviewCard.swift */; };
+		A1B2C3D41AAA00010000000B /* SystemStatusCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000B /* SystemStatusCard.swift */; };
+		A1B2C3D41AAA00010000000C /* DashboardState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000C /* DashboardState.swift */; };
+		A1B2C3D41AAA00010000000D /* DashboardDesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000D /* DashboardDesignTokens.swift */; };
+		A1B2C3D41AAA00010000000E /* SeminarStartPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000E /* SeminarStartPolicy.swift */; };
+		A1B2C3D41AAA00010000000F /* UserSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA00010000000F /* UserSession.swift */; };
+		A1B2C3D41AAA000100000010 /* RuntimeSessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000010 /* RuntimeSessionState.swift */; };
+		A1B2C3D41AAA000100000011 /* ServiceCredential.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000011 /* ServiceCredential.swift */; };
+		A1B2C3D41AAA000100000012 /* AuthorizationRule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D31AAA000100000012 /* AuthorizationRule.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -23,6 +35,18 @@
 		A1B2C3D31AAA000100000004 /* ControllerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ControllerViewModel.swift; path = app/controller/ControllerViewModel.swift; sourceTree = SOURCE_ROOT; };
 		A1B2C3D31AAA000100000005 /* SlideNotesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SlideNotesView.swift; path = app/controller/SlideNotesView.swift; sourceTree = SOURCE_ROOT; };
 		A1B2C3D31AAA000100000006 /* SlideViewportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SlideViewportView.swift; path = app/controller/SlideViewportView.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000007 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardViewModel.swift; path = app/controller/DashboardViewModel.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000008 /* DashboardRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardRootView.swift; path = app/controller/DashboardRootView.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000009 /* ConnectionMonitorCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ConnectionMonitorCard.swift; path = app/controller/ConnectionMonitorCard.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000A /* ParticipantOverviewCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ParticipantOverviewCard.swift; path = app/controller/ParticipantOverviewCard.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000B /* SystemStatusCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SystemStatusCard.swift; path = app/controller/SystemStatusCard.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000C /* DashboardState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardState.swift; path = Sources/GaiaCore/Dashboard/DashboardState.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000D /* DashboardDesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DashboardDesignTokens.swift; path = Sources/GaiaCore/Design/DashboardDesignTokens.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000E /* SeminarStartPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SeminarStartPolicy.swift; path = Sources/GaiaCore/Dashboard/SeminarStartPolicy.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA00010000000F /* UserSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UserSession.swift; path = Sources/GaiaCore/Authentication/UserSession.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000010 /* RuntimeSessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RuntimeSessionState.swift; path = Sources/GaiaCore/Authentication/RuntimeSessionState.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000011 /* ServiceCredential.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = ServiceCredential.swift; path = Sources/GaiaCore/Authentication/ServiceCredential.swift; sourceTree = SOURCE_ROOT; };
+		A1B2C3D31AAA000100000012 /* AuthorizationRule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AuthorizationRule.swift; path = Sources/GaiaCore/Authentication/AuthorizationRule.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +64,7 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D11AAA000100000002 /* GaiaControllerApp */,
+				A1B2C3D11AAA000100000004 /* GaiaCoreSources */,
 				A1B2C3D11AAA000100000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -53,6 +78,11 @@
 				A1B2C3D31AAA000100000004 /* ControllerViewModel.swift */,
 				A1B2C3D31AAA000100000005 /* SlideNotesView.swift */,
 				A1B2C3D31AAA000100000006 /* SlideViewportView.swift */,
+				A1B2C3D31AAA000100000007 /* DashboardViewModel.swift */,
+				A1B2C3D31AAA000100000008 /* DashboardRootView.swift */,
+				A1B2C3D31AAA000100000009 /* ConnectionMonitorCard.swift */,
+				A1B2C3D31AAA00010000000A /* ParticipantOverviewCard.swift */,
+				A1B2C3D31AAA00010000000B /* SystemStatusCard.swift */,
 			);
 			path = GaiaControllerApp;
 			sourceTree = "<group>";
@@ -63,6 +93,20 @@
 				A1B2C3D21AAA000100000001 /* GaiaControllerApp.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A1B2C3D11AAA000100000004 /* GaiaCoreSources */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D31AAA00010000000C /* DashboardState.swift */,
+				A1B2C3D31AAA00010000000D /* DashboardDesignTokens.swift */,
+				A1B2C3D31AAA00010000000E /* SeminarStartPolicy.swift */,
+				A1B2C3D31AAA00010000000F /* UserSession.swift */,
+				A1B2C3D31AAA000100000010 /* RuntimeSessionState.swift */,
+				A1B2C3D31AAA000100000011 /* ServiceCredential.swift */,
+				A1B2C3D31AAA000100000012 /* AuthorizationRule.swift */,
+			);
+			name = GaiaCoreSources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -139,6 +183,18 @@
 				A1B2C3D41AAA000100000004 /* ControllerViewModel.swift in Sources */,
 				A1B2C3D41AAA000100000005 /* SlideNotesView.swift in Sources */,
 				A1B2C3D41AAA000100000006 /* SlideViewportView.swift in Sources */,
+				A1B2C3D41AAA000100000007 /* DashboardViewModel.swift in Sources */,
+				A1B2C3D41AAA000100000008 /* DashboardRootView.swift in Sources */,
+				A1B2C3D41AAA000100000009 /* ConnectionMonitorCard.swift in Sources */,
+				A1B2C3D41AAA00010000000A /* ParticipantOverviewCard.swift in Sources */,
+				A1B2C3D41AAA00010000000B /* SystemStatusCard.swift in Sources */,
+				A1B2C3D41AAA00010000000C /* DashboardState.swift in Sources */,
+				A1B2C3D41AAA00010000000D /* DashboardDesignTokens.swift in Sources */,
+				A1B2C3D41AAA00010000000E /* SeminarStartPolicy.swift in Sources */,
+				A1B2C3D41AAA00010000000F /* UserSession.swift in Sources */,
+				A1B2C3D41AAA000100000010 /* RuntimeSessionState.swift in Sources */,
+				A1B2C3D41AAA000100000011 /* ServiceCredential.swift in Sources */,
+				A1B2C3D41AAA000100000012 /* AuthorizationRule.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,9 +204,11 @@
 		A1B2C3D81AAA000100000001 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Manual;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -172,9 +230,10 @@
 		A1B2C3D81AAA000100000002 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				ENABLE_DEBUG_DYLIB = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -183,6 +242,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.laparo.GaiaControllerApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -221,6 +281,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -276,6 +337,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
@@ -291,6 +353,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = NO;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";

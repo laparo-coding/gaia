@@ -5,13 +5,14 @@ import PackageDescription
 let package = Package(
   name: "Gaia",
   platforms: [
-    .macOS(.v10_15)
+    .macOS(.v12)
   ],
   products: [
     .library(name: "GaiaCore", targets: ["GaiaCore"]),
     .library(name: "GaiaFeatureCatalog", targets: ["GaiaFeatureCatalog"]),
     .executable(name: "GaiaCLI", targets: ["GaiaCLI"]),
     .executable(name: "GaiaAuthenticationApp", targets: ["GaiaAuthenticationApp"]),
+    .executable(name: "GaiaControllerApp", targets: ["GaiaControllerApp"]),
   ],
   dependencies: [
     .package(url: "https://github.com/rollbar/rollbar-apple", from: "3.4.0")
@@ -43,6 +44,14 @@ let package = Package(
         "sign-in/route.swift",
         "service/hemera/route.swift",
         "service/aither/route.swift",
+      ]
+    ),
+    .executableTarget(
+      name: "GaiaControllerApp",
+      dependencies: ["GaiaCore"],
+      path: "app/controller",
+      exclude: [
+        "README.md"
       ]
     ),
     .testTarget(

@@ -1,21 +1,21 @@
 # Controller Performance Results
 
-- Run timestamp (UTC): 2026-05-31T22:09:40Z
-- Base URL: http://127.0.0.1:8099
+- Run timestamp (UTC): 2026-06-06T18:24:40Z
+- Base URL: http://127.0.0.1:8080
 - Course ID: course-123
-- Iterations (next/previous pairs): 10
+- Iterations (next/previous pairs): 5
 - Initial target: <= 2.0s
 - Navigation target (mean next): <= 0.150s
 
 ## Measurements
 
-- Presentation fetch: 0.001458s
-- First slide fetch: 0.001050s
-- Initial total (presentation + first slide): 0.003s -> PASS
-- Next navigation mean: 0.001s -> PASS
-- Next navigation max: 0.002s
+- Presentation fetch: 0.021478s
+- First slide fetch: 0.003498s
+- Initial total (presentation + first slide): 0.025s -> PASS
+- Next navigation mean: 0.005s -> PASS
+- Next navigation max: 0.006s
 
 ## Raw Next Navigation Times (s)
 
-0.000901 0.000921 0.001000 0.001007 0.000974 0.000885 0.001101 0.001009 0.000971 0.001907 
+0.003894 0.005095 0.005575 0.004787 0.003738 
 

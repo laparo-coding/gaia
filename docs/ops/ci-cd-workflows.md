@@ -181,6 +181,21 @@ Configured in GitHub repository settings:
 - **CLI:** `.codacy/cli.sh` manages v2 binary
   - Downloads on demand
   - Caches locally
+- **Local script behavior:** `scripts/ci-cd/codacy-standard-check.sh`
+   - Always runs `opengrep` for baseline static analysis (consistent path coverage)
+   - Adds `eslint` when JS/TS files are present in canonical JS/TS source roots
+     (`app/`, `web/`, `client/`, `frontend/`, `ui/`); ignores build/dependency
+     artifacts (`node_modules`, `.next`, `dist`, `build`) and Swift roots
+     (`Sources/`, `Tests/`) even if they incidentally contain JS/TS contract specs
+   - Adds `trivy` by default for security scan; disabled only with `--skip-trivy`
+   - Uses additive tool selection to avoid coverage gaps caused by mutually exclusive tool picks
+   - Per-tool invocations are sequential to bypass the Codacy CLI's exclusive
+     `--tool` handling, preserving a stable order:
+     `opengrep` → `eslint` (when applicable) → `trivy` (when not skipped)
+   - Tool selection is driven by the external config
+     `scripts/ci-cd/codacy-tools.conf` (`ESLINT_ROOTS`, `ESLINT_EXCLUDE_PATHS`,
+     `ESLINT_EXTENSIONS`, `TOOL_ORDER`); the script falls back to identical
+     built-in defaults if the config is missing
 
 ---
 

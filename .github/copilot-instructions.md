@@ -39,4 +39,13 @@ tests/
 - 005-authentication: Added Swift 6.1 package manifest with Swift 6.x code targets + Foundation, SwiftPM modules (`GaiaCore`, `GaiaFeatureCatalog`), future authentication provider integration, server-side Bearer service credentials for Hemera and Aither
 
 <!-- MANUAL ADDITIONS START -->
+## Caveman Mode (Manual)
+
+- Reference: `.github/caveman-mode.md`.
+
 <!-- MANUAL ADDITIONS END -->
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

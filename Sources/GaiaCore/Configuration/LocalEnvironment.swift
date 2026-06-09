@@ -1,6 +1,11 @@
 import Foundation
 
 public enum LocalEnvironment {
+  public static let dashboardCacheTTLKey = "GAIA_DASHBOARD_CACHE_TTL_SECONDS"
+  public static let dashboardStatusEventsEndpointKey = "GAIA_DASHBOARD_SSE_ENDPOINT"
+  public static let defaultDashboardCacheTTL: TimeInterval = 45
+  public static let defaultDashboardStatusEventsEndpoint = "/api/dashboard/status/events"
+
   public static func mergedWithProcessEnvironment(
     currentDirectoryPath: String,
     processEnvironment: [String: String]
@@ -14,6 +19,58 @@ public enum LocalEnvironment {
     )
 
     return fileEnvironment.merging(processEnvironment) { _, processValue in processValue }
+  }
+
+  public static func dashboardCacheTTL(in environment: [String: String]) -> TimeInterval {
+    guard
+      let rawValue = environment[dashboardCacheTTLKey],
+      let parsedValue = Double(rawValue),
+      parsedValue > 0
+    else {
+      return defaultDashboardCacheTTL
+    }
+
+    return parsedValue
+  }
+
+  public static func dashboardStatusEventsEndpoint(in environment: [String: String]) -> String {
+    guard
+      let endpoint = environment[dashboardStatusEventsEndpointKey]?.trimmingCharacters(
+        in: .whitespacesAndNewlines), !endpoint.isEmpty
+    else {
+      return defaultDashboardStatusEventsEndpoint
+    }
+
+    guard let normalizedEndpoint = normalizeDashboardStatusEndpoint(endpoint) else {
+      return defaultDashboardStatusEventsEndpoint
+    }
+
+    return normalizedEndpoint
+  }
+
+  static func normalizeDashboardStatusEndpoint(_ endpoint: String) -> String? {
+    if endpoint.contains("://") {
+      guard let components = URLComponents(string: endpoint),
+        let scheme = components.scheme,
+        !scheme.isEmpty
+      else {
+        return nil
+      }
+
+      let path = components.path.trimmingCharacters(in: .whitespacesAndNewlines)
+      if path.isEmpty || path == "/" {
+        return defaultDashboardStatusEventsEndpoint
+      }
+
+      return path.hasPrefix("/") ? path : "/" + path
+    }
+
+    let trimmedPath = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmedPath.isEmpty else {
+      return nil
+    }
+
+    return trimmedPath.hasPrefix("/") ? trimmedPath : "/" + trimmedPath
   }
 
   static func resolveRepositoryRoot(from currentDirectoryPath: String) -> URL? {
