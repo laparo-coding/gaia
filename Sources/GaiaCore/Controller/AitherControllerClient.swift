@@ -159,7 +159,8 @@ public struct AitherControllerClient: Sendable {
     }
 
     do {
-      let payload = try decoder.decode(SuccessEnvelope<NavigationResponse>.self, from: response.body)
+      let payload = try decoder.decode(
+        SuccessEnvelope<NavigationResponse>.self, from: response.body)
       let slide = try mapSlide(payload.data)
       return AuthorizedRequestResult(
         value: slide,

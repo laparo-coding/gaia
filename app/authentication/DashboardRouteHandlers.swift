@@ -121,7 +121,8 @@ enum DashboardRouteHandlers {
     now: Date = Date()
   ) async -> AuthenticationRouteResponse<DashboardParticipantsPayload> {
     guard
-      let selectedCourse = await selectCourse(runtime: runtime, environment: environment, courseID: courseID, now: now),
+      let selectedCourse = await selectCourse(
+        runtime: runtime, environment: environment, courseID: courseID, now: now),
       let courseDetail = await fetchCourseDetail(
         runtime: runtime,
         environment: environment,
