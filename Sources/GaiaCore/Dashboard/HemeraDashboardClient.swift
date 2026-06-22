@@ -44,11 +44,21 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
     let events: Events
   }
 
+  /// Transport seam: fetches the raw response body for a dashboard route.
+  ///
+  /// Production wiring supplies an authenticated transport backed by
+  /// `DownstreamServiceClient` + `AuthenticationRuntime` (Spec 005), which
+  /// attaches `X-API-Key` for Hemera and performs the one-retry-on-`401`
+  /// behavior. Tests can supply an in-memory transport. The default transport
+  /// uses the injected `URLSession` against `baseURL` (no auth) to preserve the
+  /// existing `URLSession`-stub test harness.
+  public typealias Transport = @Sendable (_ path: String, _ requestID: String) async throws -> Data
+
   private let baseURL: URL
-  private let session: URLSession
   private let cache: DashboardCache<String, DashboardSnapshot>
   private let ttl: TimeInterval
   private let decoder: JSONDecoder
+  private let transport: Transport
 
   public init(
     baseURL: URL,
@@ -56,13 +66,81 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
     cache: DashboardCache<String, DashboardSnapshot> = DashboardCache(),
     ttl: TimeInterval = 45
   ) {
-    self.baseURL = baseURL
-    self.session = session
-    self.cache = cache
-    self.ttl = ttl
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .iso8601
+
+    self.baseURL = baseURL
+    self.cache = cache
+    self.ttl = ttl
     self.decoder = decoder
+    self.transport = Self.makeSessionTransport(baseURL: baseURL, session: session)
+  }
+
+  /// Designated initializer with an injected transport. Use the
+  /// `authenticated(...)` factory for production wiring through Spec 005 auth.
+  public init(
+    baseURL: URL,
+    transport: @escaping Transport,
+    cache: DashboardCache<String, DashboardSnapshot> = DashboardCache(),
+    ttl: TimeInterval = 45
+  ) {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+
+    self.baseURL = baseURL
+    self.cache = cache
+    self.ttl = ttl
+    self.decoder = decoder
+    self.transport = transport
+  }
+
+  /// Builds an authenticated Hemera dashboard client routed through the Spec 005
+  /// downstream auth stack. Attaches `X-API-Key` and reuses the one-retry-on-`401`
+  /// behavior from `AuthenticationRuntime`/`ServiceAuthorizationCoordinator`.
+  public static func authenticated(
+    baseURL: URL,
+    downstreamClient: DownstreamServiceClient,
+    cache: DashboardCache<String, DashboardSnapshot> = DashboardCache(),
+    ttl: TimeInterval = 45,
+    operation: String = "dashboard:load-snapshot"
+  ) -> HemeraDashboardClient {
+    let transport: Transport = { path, requestID in
+      let result = await downstreamClient.send(
+        service: .hemera,
+        baseURL: baseURL,
+        path: path,
+        method: "GET",
+        operation: operation,
+        requestId: requestID
+      )
+
+      if let error = result.error {
+        throw error
+      }
+
+      guard let response = result.value, response.statusCode == 200 else {
+        throw DashboardDataError.transportFailure(
+          statusCode: result.value?.statusCode
+        )
+      }
+
+      return response.body
+    }
+
+    return HemeraDashboardClient(
+      baseURL: baseURL, transport: transport, cache: cache, ttl: ttl)
+  }
+
+  private static func makeSessionTransport(baseURL: URL, session: URLSession) -> Transport {
+    { path, _ in
+      let url = try Self.makeURL(baseURL: baseURL, path: path)
+      let (data, response) = try await session.data(from: url)
+      guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+        throw DashboardDataError.transportFailure(
+          statusCode: (response as? HTTPURLResponse)?.statusCode)
+      }
+      return data
+    }
   }
 
   public func loadSnapshot(
@@ -82,9 +160,9 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
     }
 
     do {
-      async let participants = fetchParticipants(courseID: courseID)
-      async let status = fetchStatus()
-      async let system = fetchSystemHealth()
+      async let participants = fetchParticipants(courseID: courseID, requestID: requestID)
+      async let status = fetchStatus(requestID: requestID)
+      async let system = fetchSystemHealth(requestID: requestID)
 
       let snapshot = try await composeSnapshot(
         participantsResponse: participants,
@@ -95,11 +173,15 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
       await cache.store(value: snapshot, for: courseID, now: now, ttl: ttl)
       return snapshot
     } catch {
+      // Soft-fail (FR-007): serve usable stale cache when present...
       if let cached = await cache.valueIfUsable(for: courseID, at: now) {
         return cached.markingStale()
       }
 
-      return DashboardSnapshot.demo(courseID: courseID, now: now).markingStale()
+      // ...otherwise surface an explicit degraded snapshot. No placeholder/demo
+      // runtime data is served on the production path (FR-001/FR-002;
+      // Constitution VI).
+      return DashboardSnapshot.degraded(courseID: courseID, now: now)
     }
   }
 
@@ -139,29 +221,31 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
     )
   }
 
-  private func fetchParticipants(courseID: String) async throws -> ParticipantsResponse {
+  private func fetchParticipants(
+    courseID: String, requestID: String
+  ) async throws -> ParticipantsResponse {
     try await fetchDecoded(
       path: "/api/dashboard/participants?courseId=\(courseID)",
+      requestID: requestID,
       type: ParticipantsResponse.self
     )
   }
 
-  private func fetchStatus() async throws -> StatusResponse {
-    try await fetchDecoded(path: "/api/dashboard/status", type: StatusResponse.self)
-  }
-
-  private func fetchSystemHealth() async throws -> SystemHealthMetricsResponse {
+  private func fetchStatus(requestID: String) async throws -> StatusResponse {
     try await fetchDecoded(
-      path: "/api/dashboard/system-health", type: SystemHealthMetricsResponse.self)
+      path: "/api/dashboard/status", requestID: requestID, type: StatusResponse.self)
   }
 
-  private func fetchDecoded<Value: Decodable>(path: String, type: Value.Type) async throws -> Value
-  {
-    let url = try makeURL(path: path)
-    let (data, response) = try await session.data(from: url)
-    guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-      throw URLError(.badServerResponse)
-    }
+  private func fetchSystemHealth(requestID: String) async throws -> SystemHealthMetricsResponse {
+    try await fetchDecoded(
+      path: "/api/dashboard/system-health", requestID: requestID,
+      type: SystemHealthMetricsResponse.self)
+  }
+
+  private func fetchDecoded<Value: Decodable>(
+    path: String, requestID: String, type: Value.Type
+  ) async throws -> Value {
+    let data = try await transport(path, requestID)
     return try decoder.decode(Value.self, from: data)
   }
 
@@ -169,7 +253,7 @@ public struct HemeraDashboardClient: DashboardServiceProtocol, Sendable {
   /// query component. `URL.appendingPathComponent` is not query-aware and would
   /// percent-encode the `?`, so this splits path and query first and uses
   /// `URLComponents` to attach query items correctly.
-  private func makeURL(path: String) throws -> URL {
+  private static func makeURL(baseURL: URL, path: String) throws -> URL {
     let trimmedPath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
     let routePath: String
     let routeQuery: String?
@@ -208,4 +292,11 @@ private struct SystemHealthMetricsResponse: Decodable {
   let version: String
   let serviceStatus: DashboardServiceHealth
   let lastUpdatedAt: Date
+}
+
+/// Structured failures for the dashboard data path (Constitution VI: errors
+/// MUST be structured and attributable rather than stringly-typed).
+public enum DashboardDataError: Error, Equatable, Sendable {
+  /// The downstream transport returned a non-200 status (or no usable response).
+  case transportFailure(statusCode: Int?)
 }

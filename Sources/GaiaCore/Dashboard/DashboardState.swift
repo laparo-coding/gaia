@@ -80,6 +80,12 @@ public struct DashboardSnapshot: Equatable, Sendable {
     self.warningMessage = warningMessage
   }
 
+  /// Placeholder snapshot for **tests and SwiftUI previews only**.
+  ///
+  /// - Important: This MUST NOT be used on production runtime/data paths.
+  ///   Placeholder runtime behavior is forbidden for production-critical code
+  ///   paths (Constitution VI; FR-001/FR-002). The live fetch path degrades via
+  ///   `degraded(courseID:now:)` or a stale cache instead.
   public static func demo(courseID: String = "course-123", now: Date = Date()) -> DashboardSnapshot
   {
     DashboardSnapshot(
@@ -107,6 +113,30 @@ public struct DashboardSnapshot: Equatable, Sendable {
         serviceStatus: .healthy,
         lastUpdatedAt: now
       )
+    )
+  }
+
+  /// Explicit degraded snapshot served on the production path when a fetch fails
+  /// and no usable cache exists.
+  ///
+  /// Carries **no placeholder participant data** (FR-001/FR-002): an empty
+  /// participant list, `unavailable` service status, and the stale warning so
+  /// only the affected card degrades (soft-fail, FR-007).
+  public static func degraded(
+    courseID: String,
+    now: Date = Date()
+  ) -> DashboardSnapshot {
+    DashboardSnapshot(
+      course: DashboardCourse(id: courseID, title: ""),
+      participants: [],
+      connection: DashboardConnectionStatus(aither: .disconnected, hemera: .disconnected),
+      system: DashboardSystemMetrics(
+        version: "",
+        serviceStatus: .unavailable,
+        lastUpdatedAt: now
+      ),
+      isStale: true,
+      warningMessage: "Daten evtl. veraltet"
     )
   }
 

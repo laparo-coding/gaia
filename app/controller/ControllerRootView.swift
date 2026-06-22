@@ -13,6 +13,7 @@ struct ControllerRootView: View {
       } else {
         DashboardRootView(viewModel: dashboardViewModel) {
           Task {
+            viewModel.setCourseID(dashboardViewModel.snapshot.course.id)
             await viewModel.loadInitialPresentation()
             isPresentingSlides = true
           }

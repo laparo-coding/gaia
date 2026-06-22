@@ -1,6 +1,41 @@
 import Foundation
 import GaiaCore
 
+private struct HemeraCoursesEnvelope: Decodable {
+  struct CourseSummary: Decodable {
+    let id: String
+    let title: String
+  }
+
+  let data: [CourseSummary]
+}
+
+private struct HemeraCourseDetailEnvelope: Decodable {
+  struct CourseDetail: Decodable {
+    struct Participant: Decodable {
+      let id: String
+      let displayName: String
+      let avatarUrl: String?
+    }
+
+    let id: String
+    let title: String
+    let participants: [Participant]
+  }
+
+  let data: CourseDetail
+}
+
+private struct HemeraHealthEnvelope: Decodable {
+  struct HealthPayload: Decodable {
+    let status: String
+    let timestamp: Date
+    let version: String
+  }
+
+  let data: HealthPayload
+}
+
 struct DashboardStatusPayload: Codable, Equatable, Sendable {
   struct Connection: Codable, Equatable, Sendable {
     let aither: String
@@ -56,46 +91,81 @@ enum DashboardRouteHandlers {
   static let participantsPath = "/api/dashboard/participants"
   static let systemHealthPath = "/api/dashboard/system-health"
 
-  static func getStatus(now: Date = Date()) -> AuthenticationRouteResponse<DashboardStatusPayload> {
-    AuthenticationRouteResponse(
+  static func getStatus(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
+    now: Date = Date()
+  ) async -> AuthenticationRouteResponse<DashboardStatusPayload> {
+    let health = await fetchHemeraHealth(runtime: runtime, environment: environment, now: now)
+    let serviceStatus: DashboardServiceHealth = health?.status == "ok" ? .healthy : .unavailable
+    let connectionState: DashboardConnectionState = health == nil ? .disconnected : .connected
+
+    return AuthenticationRouteResponse(
       statusCode: 200,
       body: DashboardStatusPayload(
         connection: .init(
-          aither: DashboardConnectionState.connected.rawValue,
-          hemera: DashboardConnectionState.connected.rawValue),
-        system: .init(serviceStatus: DashboardServiceHealth.healthy.rawValue, lastUpdatedAt: now),
+          aither: connectionState.rawValue,
+          hemera: connectionState.rawValue),
+        system: .init(
+          serviceStatus: serviceStatus.rawValue,
+          lastUpdatedAt: health?.timestamp ?? now),
         events: .init(transport: "sse", endpoint: statusEventsPath)
       )
     )
   }
 
   static func getParticipants(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
     courseID: String,
     now: Date = Date()
-  ) -> AuthenticationRouteResponse<DashboardParticipantsPayload> {
+  ) async -> AuthenticationRouteResponse<DashboardParticipantsPayload> {
+    guard
+      let selectedCourse = await selectCourse(runtime: runtime, environment: environment, courseID: courseID, now: now),
+      let courseDetail = await fetchCourseDetail(
+        runtime: runtime,
+        environment: environment,
+        courseID: selectedCourse.id,
+        now: now)
+    else {
+      return AuthenticationRouteResponse(
+        statusCode: 502,
+        body: DashboardParticipantsPayload(
+          course: .init(id: courseID, title: ""),
+          participants: [],
+          cache: .init(isStale: true, ttlSeconds: 45)
+        )
+      )
+    }
+
     return AuthenticationRouteResponse(
       statusCode: 200,
       body: DashboardParticipantsPayload(
-        course: .init(id: courseID, title: "Gaia Seminar"),
-        participants: [
-          .init(id: "user-1", displayName: "Alex Example", avatarUrl: nil),
-          .init(id: "user-2", displayName: "Mara Muster", avatarUrl: nil),
-          .init(id: "user-3", displayName: "Sam Sample", avatarUrl: nil),
-        ],
+        course: .init(id: courseDetail.id, title: courseDetail.title),
+        participants: courseDetail.participants.map {
+          .init(id: $0.id, displayName: $0.displayName, avatarUrl: $0.avatarUrl)
+        },
         cache: .init(isStale: false, ttlSeconds: 45)
       )
     )
   }
 
-  static func getSystemHealth(now: Date = Date()) -> AuthenticationRouteResponse<
+  static func getSystemHealth(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
+    now: Date = Date()
+  ) async -> AuthenticationRouteResponse<
     DashboardSystemHealthPayload
   > {
-    AuthenticationRouteResponse(
+    let health = await fetchHemeraHealth(runtime: runtime, environment: environment, now: now)
+
+    return AuthenticationRouteResponse(
       statusCode: 200,
       body: DashboardSystemHealthPayload(
-        version: "1.0.0",
-        serviceStatus: DashboardServiceHealth.healthy.rawValue,
-        lastUpdatedAt: now
+        version: health?.version ?? "",
+        serviceStatus: (health?.status == "ok" ? DashboardServiceHealth.healthy : .unavailable)
+          .rawValue,
+        lastUpdatedAt: health?.timestamp ?? now
       )
     )
   }
@@ -170,5 +240,112 @@ enum DashboardRouteHandlers {
       return nil
     }
     return "event: \(event.type.rawValue)\ndata: \(payload)\n\n"
+  }
+
+  private static func hemeraBaseURL(in environment: [String: String]) -> URL? {
+    if let configured = environment[LocalEnvironment.hemeraBaseURLKey],
+      let url = URL(string: configured)
+    {
+      return url
+    }
+
+    return URL(string: "http://127.0.0.1:3000")
+  }
+
+  private static func decoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
+  }
+
+  private static func fetchHemeraHealth(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
+    now: Date
+  ) async -> HemeraHealthEnvelope.HealthPayload? {
+    guard let baseURL = hemeraBaseURL(in: environment) else {
+      return nil
+    }
+
+    let client = DownstreamServiceClient(runtime: runtime)
+    let result = await client.send(
+      service: .hemera,
+      baseURL: baseURL,
+      path: "/api/health",
+      method: "GET",
+      operation: "dashboard:system-health",
+      requestId: "dashboard-system-health",
+      now: now
+    )
+
+    guard let response = result.value, response.statusCode == 200 else {
+      return nil
+    }
+
+    return try? decoder().decode(HemeraHealthEnvelope.self, from: response.body).data
+  }
+
+  private static func selectCourse(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
+    courseID: String,
+    now: Date
+  ) async -> HemeraCoursesEnvelope.CourseSummary? {
+    guard let baseURL = hemeraBaseURL(in: environment) else {
+      return nil
+    }
+
+    let client = DownstreamServiceClient(runtime: runtime)
+    let result = await client.send(
+      service: .hemera,
+      baseURL: baseURL,
+      path: "/api/service/courses?limit=10",
+      method: "GET",
+      operation: "dashboard:list-courses",
+      requestId: "dashboard-course-list",
+      now: now
+    )
+
+    guard let response = result.value, response.statusCode == 200,
+      let envelope = try? decoder().decode(HemeraCoursesEnvelope.self, from: response.body)
+    else {
+      return nil
+    }
+
+    if courseID != "course-123", let requested = envelope.data.first(where: { $0.id == courseID }) {
+      return requested
+    }
+
+    return envelope.data.first
+  }
+
+  private static func fetchCourseDetail(
+    runtime: AuthenticationRuntime,
+    environment: [String: String],
+    courseID: String,
+    now: Date
+  ) async -> HemeraCourseDetailEnvelope.CourseDetail? {
+    guard let baseURL = hemeraBaseURL(in: environment) else {
+      return nil
+    }
+
+    let client = DownstreamServiceClient(runtime: runtime)
+    let result = await client.send(
+      service: .hemera,
+      baseURL: baseURL,
+      path: "/api/service/courses/\(courseID)",
+      method: "GET",
+      operation: "dashboard:course-detail",
+      requestId: "dashboard-course-detail",
+      now: now
+    )
+
+    guard let response = result.value, response.statusCode == 200,
+      let envelope = try? decoder().decode(HemeraCourseDetailEnvelope.self, from: response.body)
+    else {
+      return nil
+    }
+
+    return envelope.data
   }
 }

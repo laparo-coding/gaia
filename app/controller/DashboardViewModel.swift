@@ -60,7 +60,7 @@ final class DashboardViewModel: ObservableObject {
     case failed(message: String)
   }
 
-  @Published private(set) var snapshot = DashboardSnapshot.demo()
+  @Published private(set) var snapshot = DashboardSnapshot.degraded(courseID: "")
   @Published private(set) var status: Status = .idle
   @Published private(set) var canStartSeminar = false
 
@@ -130,7 +130,7 @@ final class DashboardViewModel: ObservableObject {
       )
       status = .ready
     } catch {
-      snapshot = DashboardSnapshot.demo().markingStale()
+      snapshot = DashboardSnapshot.degraded(courseID: courseID)
       canStartSeminar = false
       status = .failed(message: "Dashboard-Daten konnten nicht geladen werden.")
     }

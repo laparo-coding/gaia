@@ -173,7 +173,7 @@ private struct AuthenticationAppConfiguration {
     _ = try await runtime.completeSignIn(
       sessionId: "local-controller-dev-session",
       subjectId: "local-controller-dev-user",
-      role: "developer",
+      role: "moderator",
       issuedAt: now,
       expiresAt: now.addingTimeInterval(8 * 60 * 60)
     )
@@ -569,7 +569,11 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
     case ("GET", DashboardRouteHandlers.statusPath):
-      let response = DashboardRouteHandlers.getStatus(now: Date())
+      let response = await DashboardRouteHandlers.getStatus(
+        runtime: runtime,
+        environment: environment,
+        now: Date()
+      )
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
     case ("GET", DashboardRouteHandlers.participantsPath):
@@ -584,11 +588,19 @@ private final class AuthenticationHTTPServer: @unchecked Sendable {
         )
       }
 
-      let response = DashboardRouteHandlers.getParticipants(courseID: courseID)
+      let response = await DashboardRouteHandlers.getParticipants(
+        runtime: runtime,
+        environment: environment,
+        courseID: courseID
+      )
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
     case ("GET", DashboardRouteHandlers.systemHealthPath):
-      let response = DashboardRouteHandlers.getSystemHealth(now: Date())
+      let response = await DashboardRouteHandlers.getSystemHealth(
+        runtime: runtime,
+        environment: environment,
+        now: Date()
+      )
       return makeJSONResponse(statusCode: response.statusCode, body: response.body)
 
     case ("GET", DashboardRouteHandlers.statusEventsPath):

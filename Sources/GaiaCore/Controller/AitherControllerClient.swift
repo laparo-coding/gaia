@@ -1,14 +1,17 @@
 import Foundation
 
 public struct AitherControllerClient: Sendable {
+  private struct SuccessEnvelope<Value: Decodable>: Decodable {
+    let success: Bool
+    let data: Value
+  }
+
   private struct ManifestResponse: Decodable {
     struct SlideResponse: Decodable {
       let index: Int
       let fileName: String
-      let notes: String?
-      let notesSource: String?
-      let title: String?
-      let etag: String?
+      let noteTitle: String?
+      let noteBody: String?
     }
 
     let courseId: String
@@ -28,17 +31,12 @@ public struct AitherControllerClient: Sendable {
   }
 
   private struct NavigationResponse: Decodable {
-    struct SlideResponse: Decodable {
-      let index: Int
-      let fileName: String
-      let notes: String?
-      let notesSource: String?
-      let title: String?
-      let etag: String?
-    }
-
+    let presentationId: String
     let activeSlideIndex: Int
-    let slide: SlideResponse
+    let fileName: String
+    let noteTitle: String?
+    let noteBody: String?
+    let lastUpdated: Date?
   }
 
   public let bridgeBaseURL: URL
@@ -97,8 +95,8 @@ public struct AitherControllerClient: Sendable {
     }
 
     do {
-      let payload = try decoder.decode(ManifestResponse.self, from: response.body)
-      let manifest = try mapManifest(payload)
+      let payload = try decoder.decode(SuccessEnvelope<ManifestResponse>.self, from: response.body)
+      let manifest = try mapManifest(payload.data)
       return AuthorizedRequestResult(
         value: manifest,
         authorization: upstream.authorization,
@@ -161,8 +159,8 @@ public struct AitherControllerClient: Sendable {
     }
 
     do {
-      let payload = try decoder.decode(NavigationResponse.self, from: response.body)
-      let slide = try mapSlide(payload.slide)
+      let payload = try decoder.decode(SuccessEnvelope<NavigationResponse>.self, from: response.body)
+      let slide = try mapSlide(payload.data)
       return AuthorizedRequestResult(
         value: slide,
         authorization: upstream.authorization,
@@ -247,7 +245,7 @@ public struct AitherControllerClient: Sendable {
 
     let notes: String
 
-    if let upstreamNotes = response.notes {
+    if let upstreamNotes = response.noteBody {
       if upstreamNotes.isEmpty {
         notes = "\(placeholderPrefix) Notes are not available yet."
       } else {
@@ -258,13 +256,7 @@ public struct AitherControllerClient: Sendable {
     }
 
     let notesSource: ControllerNotesSource
-    if let rawSource = response.notesSource,
-      let parsedSource = ControllerNotesSource(rawValue: rawSource)
-    {
-      notesSource = parsedSource
-    } else {
-      notesSource = response.notes?.isEmpty == false ? .upstream : .placeholder
-    }
+    notesSource = response.noteBody?.isEmpty == false ? .upstream : .placeholder
 
     return try ControllerSlide(
       index: response.index,
@@ -272,18 +264,18 @@ public struct AitherControllerClient: Sendable {
       htmlURL: htmlURL,
       notes: notes,
       notesSource: notesSource,
-      title: response.title,
+      title: response.noteTitle,
       contentState: .ready,
-      etag: response.etag
+      etag: nil
     )
   }
 
-  private func mapSlide(_ response: NavigationResponse.SlideResponse) throws -> ControllerSlide {
+  private func mapSlide(_ response: NavigationResponse) throws -> ControllerSlide {
     let htmlURL = makeBridgeSlideURL(fileName: response.fileName)
 
     let notes: String
 
-    if let upstreamNotes = response.notes {
+    if let upstreamNotes = response.noteBody {
       if upstreamNotes.isEmpty {
         notes = "\(placeholderPrefix) Notes are not available yet."
       } else {
@@ -294,23 +286,17 @@ public struct AitherControllerClient: Sendable {
     }
 
     let notesSource: ControllerNotesSource
-    if let rawSource = response.notesSource,
-      let parsedSource = ControllerNotesSource(rawValue: rawSource)
-    {
-      notesSource = parsedSource
-    } else {
-      notesSource = response.notes?.isEmpty == false ? .upstream : .placeholder
-    }
+    notesSource = response.noteBody?.isEmpty == false ? .upstream : .placeholder
 
     return try ControllerSlide(
-      index: response.index,
+      index: response.activeSlideIndex,
       fileName: response.fileName,
       htmlURL: htmlURL,
       notes: notes,
       notesSource: notesSource,
-      title: response.title,
+      title: response.noteTitle,
       contentState: .ready,
-      etag: response.etag
+      etag: nil
     )
   }
 

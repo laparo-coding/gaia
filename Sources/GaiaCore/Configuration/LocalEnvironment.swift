@@ -6,6 +6,64 @@ public enum LocalEnvironment {
   public static let defaultDashboardCacheTTL: TimeInterval = 45
   public static let defaultDashboardStatusEventsEndpoint = "/api/dashboard/status/events"
 
+  /// Environment key for the Hemera service base URL (per-environment configurable, FR-009).
+  public static let hemeraBaseURLKey = "GAIA_HEMERA_BASE_URL"
+  /// Environment key for the Aither service base URL (per-environment configurable, FR-009).
+  public static let aitherBaseURLKey = "GAIA_AITHER_BASE_URL"
+
+  /// Structured configuration failure for required environment values.
+  ///
+  /// Missing or invalid required configuration MUST fail explicitly rather than
+  /// silently serving placeholder data (Constitution VI; FR-009/FR-010).
+  public enum ConfigurationError: Error, Equatable, Sendable {
+    /// The required environment key was absent or blank.
+    case missingServiceBaseURL(service: DownstreamService, key: String)
+    /// The configured value could not be parsed into a URL with a scheme.
+    case invalidServiceBaseURL(service: DownstreamService, key: String, value: String)
+  }
+
+  /// Resolves the configured base URL for a downstream service, failing
+  /// explicitly when the value is missing or malformed.
+  ///
+  /// - Parameters:
+  ///   - service: The downstream service whose base URL is requested.
+  ///   - environment: The merged environment dictionary.
+  /// - Returns: A validated absolute `URL` carrying a scheme.
+  /// - Throws: `ConfigurationError` when the value is missing or invalid.
+  public static func serviceBaseURL(
+    _ service: DownstreamService,
+    in environment: [String: String]
+  ) throws -> URL {
+    let key = baseURLKey(for: service)
+
+    guard
+      let rawValue = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !rawValue.isEmpty
+    else {
+      throw ConfigurationError.missingServiceBaseURL(service: service, key: key)
+    }
+
+    guard
+      let url = URL(string: rawValue),
+      let scheme = url.scheme?.lowercased(),
+      scheme == "http" || scheme == "https",
+      url.host != nil
+    else {
+      throw ConfigurationError.invalidServiceBaseURL(service: service, key: key, value: rawValue)
+    }
+
+    return url
+  }
+
+  static func baseURLKey(for service: DownstreamService) -> String {
+    switch service {
+    case .hemera:
+      return hemeraBaseURLKey
+    case .aither:
+      return aitherBaseURLKey
+    }
+  }
+
   public static func mergedWithProcessEnvironment(
     currentDirectoryPath: String,
     processEnvironment: [String: String]

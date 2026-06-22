@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-05-30
 
 ## Active Technologies
+- Swift 6.x (package targets), Swift 6.1 manifes + SwiftPM only, Foundation (`URLSession`), existing (009-real-data-connections)
+- In-memory `DashboardCache` (short-lived snapshot cache, TTL 30-60s); (009-real-data-connections)
 
 - Swift 6.1 package manifest with Swift 6.x code targets + Foundation, SwiftPM modules (`GaiaCore`, `GaiaFeatureCatalog`), future authentication provider integration, server-side Bearer service credentials for Hemera and Aither (005-authentication)
 
@@ -35,6 +37,7 @@ tests/
 - CI should run formatting/lint checks (`swift format lint`) and tests (`swift test`) to enforce consistency.
 
 ## Recent Changes
+- 009-real-data-connections: Added Swift 6.x (package targets), Swift 6.1 manifes + SwiftPM only, Foundation (`URLSession`), existing
 
 - 005-authentication: Added Swift 6.1 package manifest with Swift 6.x code targets + Foundation, SwiftPM modules (`GaiaCore`, `GaiaFeatureCatalog`), future authentication provider integration, server-side Bearer service credentials for Hemera and Aither
 
@@ -47,5 +50,6 @@ tests/
 
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+shell commands, and other important information, read the current plan:
+`specs/009-real-data-connections/plan.md`
 <!-- SPECKIT END -->

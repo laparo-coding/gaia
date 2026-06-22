@@ -76,6 +76,14 @@ final class ControllerViewModel: ObservableObject {
     self.courseID = courseID
   }
 
+  func setCourseID(_ courseID: String) {
+    let trimmed = courseID.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else {
+      return
+    }
+    self.courseID = trimmed
+  }
+
   func loadInitialPresentation() async {
     status = .loading
 
