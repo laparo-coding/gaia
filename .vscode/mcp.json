@@ -17,5 +17,13 @@
 			"command": "bash",
 			"args": ["${workspaceFolder}/.vscode/codacy-mcp.sh", "${workspaceFolder}/.env.local"]
 		}
-	}
+	},
+	"inputs": [
+		{
+			"id": "codacy_token",
+			"type": "promptString",
+			"description": "Enter your Codacy account token (from https://app.codacy.com/account/api-tokens)",
+			"password": true
+		}
+	]
 }
