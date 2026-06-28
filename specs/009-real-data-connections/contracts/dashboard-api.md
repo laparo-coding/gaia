@@ -16,7 +16,7 @@ On `401`/`WWW-Authenticate`: refresh the credential once and retry once
 
 ## Hemera: GET /api/dashboard/participants?courseId={id}
 
-**Response 200**
+**Response 200** (canonical Gaia output — field names match contract)
 
 ```json
 {
@@ -27,6 +27,11 @@ On `401`/`WWW-Authenticate`: refresh the credential once and retry once
   "cache": { "isStale": false, "ttlSeconds": 45 }
 }
 ```
+
+> **Note**: The upstream Hemera `/api/service/courses/{id}` response may use
+> legacy field names (`userId`, `name`, `imageUrl`). The decoder in
+> `DashboardRouteHandlers.swift` normalises both layouts to the canonical
+> schema above. See `data-model.md` for the full compatibility matrix.
 
 ## Hemera: GET /api/dashboard/status
 
