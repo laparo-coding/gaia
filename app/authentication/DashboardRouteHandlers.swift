@@ -40,31 +40,34 @@ private struct HemeraCourseDetailEnvelope: Decodable {
         case imageUrl
       }
 
-        init(from decoder: any Decoder) throws {
-          let container = try decoder.container(keyedBy: CodingKeys.self)
-          let canonical = try? decoder.container(keyedBy: CanonicalCodingKeys.self)
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let canonical = try? decoder.container(keyedBy: CanonicalCodingKeys.self)
 
-          // Canonical (contract) keys take precedence; fall back to legacy Hemera keys.
-          // Both id/userId and displayName/name are required — throw when absent.
-          let resolvedUserId = try canonical?.decodeIfPresent(String.self, forKey: .userId)
-            ?? container.decodeIfPresent(String.self, forKey: .userId)
-          let resolvedName = try canonical?.decodeIfPresent(String.self, forKey: .name)
-            ?? container.decodeIfPresent(String.self, forKey: .name)
+        // Canonical (contract) keys take precedence; fall back to legacy Hemera keys.
+        // Both id/userId and displayName/name are required — throw when absent.
+        let resolvedUserId =
+          try canonical?.decodeIfPresent(String.self, forKey: .userId)
+          ?? container.decodeIfPresent(String.self, forKey: .userId)
+        let resolvedName =
+          try canonical?.decodeIfPresent(String.self, forKey: .name)
+          ?? container.decodeIfPresent(String.self, forKey: .name)
 
-          guard let userId = resolvedUserId, let name = resolvedName else {
-            throw DecodingError.dataCorrupted(
-              .init(
-                codingPath: decoder.codingPath,
-                debugDescription: "Participant 'id'/'userId' and 'displayName'/'name' are required"
-              )
+        guard let userId = resolvedUserId, let name = resolvedName else {
+          throw DecodingError.dataCorrupted(
+            .init(
+              codingPath: decoder.codingPath,
+              debugDescription: "Participant 'id'/'userId' and 'displayName'/'name' are required"
             )
-          }
-
-          self.userId = userId
-          self.name = name
-          self.imageUrl = try canonical?.decodeIfPresent(String.self, forKey: .imageUrl)
-            ?? container.decodeIfPresent(String.self, forKey: .imageUrl)
+          )
         }
+
+        self.userId = userId
+        self.name = name
+        self.imageUrl =
+          try canonical?.decodeIfPresent(String.self, forKey: .imageUrl)
+          ?? container.decodeIfPresent(String.self, forKey: .imageUrl)
+      }
     }
 
     let id: String
@@ -333,13 +336,14 @@ enum DashboardRouteHandlers {
     }
 
     guard response.statusCode == 200 else {
-        logger.warning(
-          "Hemera health check returned non-200 status: \(response.statusCode)"
-        )
-        return nil
+      logger.warning(
+        "Hemera health check returned non-200 status: \(response.statusCode)"
+      )
+      return nil
     }
 
-    guard let payload = try? decoder().decode(HemeraHealthEnvelope.self, from: response.body).data else {
+    guard let payload = try? decoder().decode(HemeraHealthEnvelope.self, from: response.body).data
+    else {
       logger.error("Hemera health check succeeded but response body could not be decoded")
       return nil
     }

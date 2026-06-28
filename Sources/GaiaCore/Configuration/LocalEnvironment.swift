@@ -73,7 +73,7 @@ public enum LocalEnvironment {
 
     // 3. Only GAIA_ENV may explicitly opt into production.
     if let gaiaEnv = environment[runtimeEnvironmentKey],
-       let resolved = parseRuntimeEnvironment(gaiaEnv, allowProduction: true)
+      let resolved = parseRuntimeEnvironment(gaiaEnv, allowProduction: true)
     {
       return resolved
     }
@@ -155,7 +155,8 @@ public enum LocalEnvironment {
 
     do {
       let cgroup = try String(contentsOfFile: "/proc/1/cgroup", encoding: .utf8)
-      return cgroup.contains("docker") || cgroup.contains("containerd") || cgroup.contains("kubepods")
+      return cgroup.contains("docker") || cgroup.contains("containerd")
+        || cgroup.contains("kubepods")
     } catch {
       return false
     }
@@ -240,7 +241,8 @@ public enum LocalEnvironment {
   ) throws -> URL {
     let resolvedRuntimeEnvironment = runtimeEnvironment ?? self.runtimeEnvironment(in: environment)
     let configuredCandidates = try configuredServiceBaseURLCandidates(service, in: environment)
-    let defaults = defaultServiceBaseURLCandidates(service, runtimeEnvironment: resolvedRuntimeEnvironment)
+    let defaults = defaultServiceBaseURLCandidates(
+      service, runtimeEnvironment: resolvedRuntimeEnvironment)
 
     // Tier 1: configured URLs always take precedence over synthesised defaults.
     // Tier 2: defaults are used only when no configured candidate exists.
@@ -257,12 +259,13 @@ public enum LocalEnvironment {
         service: service,
         runtimeEnvironment: resolvedRuntimeEnvironment,
         environment: environment
-      ) < candidatePriority(
-        rhs,
-        service: service,
-        runtimeEnvironment: resolvedRuntimeEnvironment,
-        environment: environment
       )
+        < candidatePriority(
+          rhs,
+          service: service,
+          runtimeEnvironment: resolvedRuntimeEnvironment,
+          environment: environment
+        )
     })
 
     guard let preferred = orderedCandidates.first
@@ -282,7 +285,7 @@ public enum LocalEnvironment {
     var seen: Set<String> = []
     return urls.compactMap { url in
       let key = url.absoluteString
-          .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
       return seen.insert(key).inserted ? url : nil
     }
   }
@@ -322,7 +325,7 @@ public enum LocalEnvironment {
       guard
         let url = URL(string: rawValue),
         let scheme = url.scheme?.lowercased(),
-        (scheme == "http" || scheme == "https"),
+        scheme == "http" || scheme == "https",
         url.host != nil
       else {
         throw ConfigurationError.invalidServiceBaseURL(service: service, key: key, value: rawValue)
@@ -349,7 +352,11 @@ public enum LocalEnvironment {
   ) -> [URL] {
     switch (service, runtimeEnvironment) {
     case (.hemera, .production):
-      return [URL(string: "https://www.hemera.academy")!]
+      guard let url = URL(string: "https://www.hemera.academy") else {
+        return []
+      }
+      return [url]
+    // ...existing code...
     case (.hemera, _):
       return localNetworkCandidates(port: 3000)
     // Aither requires explicit base URL configuration in production;
@@ -363,10 +370,12 @@ public enum LocalEnvironment {
   }
 
   private static func localNetworkCandidates(port: Int) -> [URL] {
-    let loopbackURL = URL(string: "http://127.0.0.1:\(port)")!
-    let localhostURL = URL(string: "http://localhost:\(port)")!
-    let dockerBridgeURL = URL(string: "http://host.docker.internal:\(port)")!
-    return [loopbackURL, localhostURL, dockerBridgeURL]
+    let candidates = [
+      URL(string: "http://127.0.0.1:\(port)"),
+      URL(string: "http://localhost:\(port)"),
+      URL(string: "http://host.docker.internal:\(port)"),
+    ]
+    return candidates.compactMap { $0 }
   }
 
   private static func candidatePriority(

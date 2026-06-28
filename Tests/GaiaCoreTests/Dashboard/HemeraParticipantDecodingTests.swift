@@ -32,9 +32,11 @@ private struct HemeraCourseDetailEnvelope: Decodable {
 
         // Canonical (contract) keys take precedence; fall back to legacy Hemera keys.
         // Both id/userId and displayName/name are required — throw when absent.
-        let resolvedUserId = try canonical?.decodeIfPresent(String.self, forKey: .userId)
+        let resolvedUserId =
+          try canonical?.decodeIfPresent(String.self, forKey: .userId)
           ?? container.decodeIfPresent(String.self, forKey: .userId)
-        let resolvedName = try canonical?.decodeIfPresent(String.self, forKey: .name)
+        let resolvedName =
+          try canonical?.decodeIfPresent(String.self, forKey: .name)
           ?? container.decodeIfPresent(String.self, forKey: .name)
 
         guard let userId = resolvedUserId, let name = resolvedName else {
@@ -48,7 +50,8 @@ private struct HemeraCourseDetailEnvelope: Decodable {
 
         self.userId = userId
         self.name = name
-        self.imageUrl = try canonical?.decodeIfPresent(String.self, forKey: .imageUrl)
+        self.imageUrl =
+          try canonical?.decodeIfPresent(String.self, forKey: .imageUrl)
           ?? container.decodeIfPresent(String.self, forKey: .imageUrl)
       }
     }

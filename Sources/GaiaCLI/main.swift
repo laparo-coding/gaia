@@ -207,7 +207,9 @@ struct ServiceCheckCommand {
   static let usage =
     "Usage: swift run GaiaCLI service-check [--hemera-base-url <url>] [--aither-base-url <url>] [--json|-j]"
 
-  internal static func parse(arguments: [String], environment: [String: String]) throws -> ServiceCheckCommand {
+  internal static func parse(arguments: [String], environment: [String: String]) throws
+    -> ServiceCheckCommand
+  {
     var hemeraOverride: URL?
     var aitherOverride: URL?
     var index = 1
@@ -237,9 +239,11 @@ struct ServiceCheckCommand {
       index += 2
     }
 
-    let hemeraBaseURL = try hemeraOverride
+    let hemeraBaseURL =
+      try hemeraOverride
       ?? LocalEnvironment.preferredServiceBaseURL(.hemera, in: environment)
-    let aitherBaseURL = try aitherOverride
+    let aitherBaseURL =
+      try aitherOverride
       ?? LocalEnvironment.preferredServiceBaseURL(.aither, in: environment)
 
     return ServiceCheckCommand(

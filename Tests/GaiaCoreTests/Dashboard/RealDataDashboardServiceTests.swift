@@ -52,14 +52,15 @@ struct RealDataDashboardServiceTests {
     #expect(!snapshot.isStale)
   }
 
-  /// Scenario 5 / FR-009/FR-010: unset Hemera base URL fails explicitly, never
-  /// serving demo data.
+  /// Scenario 5 / FR-009/FR-010: unset Aither base URL in production fails explicitly,
+  /// never serving demo data or silently falling back to localhost.
   @Test
-  func liveServiceFailsExplicitlyWhenHemeraBaseURLMissing() async throws {
-    let runtime = try RealDataTestSupport.makeRuntime()
-
+  func liveServiceFailsExplicitlyWhenAitherBaseURLMissingInProduction() async throws {
     #expect(throws: LocalEnvironment.ConfigurationError.self) {
-      _ = try DashboardService.live(runtime: runtime, environment: [:])
+      _ = try LocalEnvironment.preferredServiceBaseURL(
+        .aither,
+        in: ["GAIA_ENV": "production"]
+      )
     }
   }
 }
