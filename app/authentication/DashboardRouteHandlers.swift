@@ -1,5 +1,11 @@
 import Foundation
 import GaiaCore
+import os
+
+private let logger = Logger(
+  subsystem: "com.laparo.gaia.authentication",
+  category: "DashboardRouteHandlers"
+)
 
 private struct HemeraCoursesEnvelope: Decodable {
   struct CourseSummary: Decodable {
@@ -12,10 +18,56 @@ private struct HemeraCoursesEnvelope: Decodable {
 
 private struct HemeraCourseDetailEnvelope: Decodable {
   struct CourseDetail: Decodable {
+    /// Backward-compatible participant decoding.
+    ///
+    /// Accepts both the legacy Hemera field layout (`userId`, `name`, `imageUrl`)
+    /// and the canonical Gaia contract layout (`id`, `displayName`, `avatarUrl`).
+    /// The canonical keys take precedence when both are present.
     struct Participant: Decodable {
-      let id: String
-      let displayName: String
-      let avatarUrl: String?
+      let userId: String
+      let name: String
+      let imageUrl: String?
+
+      private enum CanonicalCodingKeys: String, CodingKey {
+        case userId = "id"
+        case name = "displayName"
+        case imageUrl = "avatarUrl"
+      }
+
+      enum CodingKeys: String, CodingKey {
+        case userId
+        case name
+        case imageUrl
+      }
+
+      init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let canonical = try? decoder.container(keyedBy: CanonicalCodingKeys.self)
+
+        // Canonical (contract) keys take precedence; fall back to legacy Hemera keys.
+        // Both id/userId and displayName/name are required — throw when absent.
+        let resolvedUserId =
+          try canonical?.decodeIfPresent(String.self, forKey: .userId)
+          ?? container.decodeIfPresent(String.self, forKey: .userId)
+        let resolvedName =
+          try canonical?.decodeIfPresent(String.self, forKey: .name)
+          ?? container.decodeIfPresent(String.self, forKey: .name)
+
+        guard let userId = resolvedUserId, let name = resolvedName else {
+          throw DecodingError.dataCorrupted(
+            .init(
+              codingPath: decoder.codingPath,
+              debugDescription: "Participant 'id'/'userId' and 'displayName'/'name' are required"
+            )
+          )
+        }
+
+        self.userId = userId
+        self.name = name
+        self.imageUrl =
+          try canonical?.decodeIfPresent(String.self, forKey: .imageUrl)
+          ?? container.decodeIfPresent(String.self, forKey: .imageUrl)
+      }
     }
 
     let id: String
@@ -144,7 +196,7 @@ enum DashboardRouteHandlers {
       body: DashboardParticipantsPayload(
         course: .init(id: courseDetail.id, title: courseDetail.title),
         participants: courseDetail.participants.map {
-          .init(id: $0.id, displayName: $0.displayName, avatarUrl: $0.avatarUrl)
+          .init(id: $0.userId, displayName: $0.name, avatarUrl: $0.imageUrl)
         },
         cache: .init(isStale: false, ttlSeconds: 45)
       )
@@ -244,13 +296,7 @@ enum DashboardRouteHandlers {
   }
 
   private static func hemeraBaseURL(in environment: [String: String]) -> URL? {
-    if let configured = environment[LocalEnvironment.hemeraBaseURLKey],
-      let url = URL(string: configured)
-    {
-      return url
-    }
-
-    return URL(string: "http://127.0.0.1:3000")
+    return try? LocalEnvironment.preferredServiceBaseURL(.hemera, in: environment)
   }
 
   private static func decoder() -> JSONDecoder {
@@ -265,6 +311,9 @@ enum DashboardRouteHandlers {
     now: Date
   ) async -> HemeraHealthEnvelope.HealthPayload? {
     guard let baseURL = hemeraBaseURL(in: environment) else {
+      logger.warning(
+        "Hemera health check skipped: no base URL resolved from environment"
+      )
       return nil
     }
 
@@ -279,11 +328,28 @@ enum DashboardRouteHandlers {
       now: now
     )
 
-    guard let response = result.value, response.statusCode == 200 else {
+    guard let response = result.value else {
+      logger.error(
+        "Hemera health check failed: downstream client returned no response — \(result.error?.localizedDescription ?? "unknown error")"
+      )
       return nil
     }
 
-    return try? decoder().decode(HemeraHealthEnvelope.self, from: response.body).data
+    guard response.statusCode == 200 else {
+      logger.warning(
+        "Hemera health check returned non-200 status: \(response.statusCode)"
+      )
+      return nil
+    }
+
+    guard let payload = try? decoder().decode(HemeraHealthEnvelope.self, from: response.body).data
+    else {
+      logger.error("Hemera health check succeeded but response body could not be decoded")
+      return nil
+    }
+
+    logger.info("Hemera health check OK — status=\(payload.status), version=\(payload.version)")
+    return payload
   }
 
   private static func selectCourse(

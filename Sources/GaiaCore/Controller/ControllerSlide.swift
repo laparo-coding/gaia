@@ -12,9 +12,30 @@ public enum ControllerContentState: String, Codable, Sendable {
 }
 
 public struct ControllerSlide: Equatable, Sendable {
+  public struct Metadata: Equatable, Sendable {
+    public let courseID: String?
+    public let presentationID: String?
+    public let title: String?
+    public let etag: String?
+
+    public init(
+      courseID: String? = nil,
+      presentationID: String? = nil,
+      title: String? = nil,
+      etag: String? = nil
+    ) {
+      self.courseID = courseID
+      self.presentationID = presentationID
+      self.title = title
+      self.etag = etag
+    }
+  }
+
   public let index: Int
   public let fileName: String
   public let htmlURL: URL
+  public let courseID: String?
+  public let presentationID: String?
   public let notes: String
   public let notesSource: ControllerNotesSource
   public let title: String?
@@ -27,9 +48,8 @@ public struct ControllerSlide: Equatable, Sendable {
     htmlURL: URL,
     notes: String,
     notesSource: ControllerNotesSource,
-    title: String? = nil,
     contentState: ControllerContentState,
-    etag: String? = nil
+    metadata: Metadata = Metadata()
   ) throws {
     guard fileName.hasSuffix(".html") else {
       throw ControllerDomainError.invalidFileName(fileName)
@@ -42,11 +62,13 @@ public struct ControllerSlide: Equatable, Sendable {
     self.index = index
     self.fileName = fileName
     self.htmlURL = htmlURL
+    self.courseID = metadata.courseID
+    self.presentationID = metadata.presentationID
     self.notes = notes
     self.notesSource = notesSource
-    self.title = title
+    self.title = metadata.title
     self.contentState = contentState
-    self.etag = etag
+    self.etag = metadata.etag
   }
 }
 

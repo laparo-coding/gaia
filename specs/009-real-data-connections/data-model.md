@@ -57,14 +57,25 @@ structured per-card error (soft-fail). **No `demo(...)` on production path.**
 
 ## Hemera response → entity mapping
 
-| Hemera response field                 | Maps to                                   |
-| ------------------------------------- | ----------------------------------------- |
-| `course.id`, `course.title`           | `DashboardCourse`                         |
-| `participants[].id/displayName/avatarUrl` | `DashboardParticipant`                |
-| `connection.aither`, `connection.hemera`  | `DashboardConnectionStatus`           |
+| Hemera response field (canonical / legacy) | Maps to                                   |
+| ------------------------------------------- | ----------------------------------------- |
+| `course.id`, `course.title`                | `DashboardCourse`                         |
+| `participants[].id` **or** `userId`        | `DashboardParticipant.id`                 |
+| `participants[].displayName` **or** `name`  | `DashboardParticipant.displayName`        |
+| `participants[].avatarUrl` **or** `imageUrl`| `DashboardParticipant.avatarURL`          |
+| `connection.aither`, `connection.hemera`   | `DashboardConnectionStatus`              |
 | `system.serviceStatus`, `system.lastUpdatedAt`, `version` | `DashboardSystemMetrics` |
-| `cache.isStale`, `cache.ttlSeconds`   | `isStale` / cache TTL behavior            |
-| `events.transport`, `events.endpoint` | SSE status source wiring                  |
+| `cache.isStale`, `cache.ttlSeconds`        | `isStale` / cache TTL behavior            |
+| `events.transport`, `events.endpoint`      | SSE status source wiring                  |
+
+### Participant field-name compatibility
+
+The `HemeraCourseDetailEnvelope.Participant` decoder in
+`DashboardRouteHandlers.swift` accepts **both** the legacy Hemera layout
+(`userId`/`name`/`imageUrl`) and the canonical Gaia contract layout
+(`id`/`displayName`/`avatarUrl`). Canonical keys take precedence when both
+are present. This ensures forward compatibility as Hemera migrates to the
+contract schema without breaking existing deployments.
 
 ## Validation rules
 

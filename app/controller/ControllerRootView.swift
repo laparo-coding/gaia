@@ -85,12 +85,27 @@ struct ControllerRootView: View {
 
         Spacer()
 
-        Text(viewModel.slidePositionText)
-          .font(.headline.monospacedDigit())
-          .padding(.horizontal, 12)
-          .padding(.vertical, 8)
-          .background(Color.black.opacity(0.06))
-          .clipShape(Capsule())
+        HStack(spacing: 8) {
+          Button {
+            isPresentingSlides = false
+          } label: {
+            Image(systemName: "house.fill")
+              .font(.headline)
+              .foregroundStyle(Color.primary)
+              .frame(width: 36, height: 36)
+              .background(Color.black.opacity(0.06))
+              .clipShape(Circle())
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel("Dashboard öffnen")
+
+          Text(viewModel.slidePositionText)
+            .font(.headline.monospacedDigit())
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color.black.opacity(0.06))
+            .clipShape(Capsule())
+        }
       }
 
       SlideViewportView(htmlContent: viewModel.currentSlideHTML)
@@ -119,17 +134,22 @@ struct ControllerRootView: View {
   }
 
   private func controllerButton(title: String, command: ControllerViewModel.NavigationCommandKind) -> some View {
-    Button(title) {
+    Button {
+      guard viewModel.status != .loading else { return }
       Task {
         await viewModel.navigate(command: command)
       }
+    } label: {
+      Text(title)
+        .font(.headline)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(command == .next ? Color.accentColor : Color.black.opacity(0.08))
+        .foregroundStyle(command == .next ? Color.white : Color.primary)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
-    .font(.headline)
-    .frame(maxWidth: .infinity)
-    .padding(.vertical, 14)
-    .background(command == .next ? Color.accentColor : Color.black.opacity(0.08))
-    .foregroundStyle(command == .next ? Color.white : Color.primary)
-    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    .buttonStyle(.plain)
     .disabled(viewModel.status == .loading)
     .opacity(viewModel.status == .loading ? 0.6 : 1)
   }

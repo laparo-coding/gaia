@@ -9,12 +9,6 @@ final class ControllerViewModel: ObservableObject {
     case next
   }
 
-  private struct DemoSlide {
-    let title: String
-    let html: String
-    let notes: String
-  }
-
   private struct PresentationResponse: Decodable {
     struct Slide: Decodable {
       let index: Int
@@ -64,13 +58,17 @@ final class ControllerViewModel: ObservableObject {
   private let session = URLSession.shared
   private let baseURL: URL
   private var presentationID: String?
+  private var slideCount: Int = 0
   private var currentSlideIndex: Int = 0
-  private var courseID: String = "course-123"
-  private var demoSlides: [DemoSlide] = []
+  private var courseID: String = "cmjpyww020000nocz1nry3ywm"
+
+  /// Auto-Reconnect: alle 5s versuchen, Verbindung zu Hemera/Aither wiederherzustellen.
+  private static let reconnectInterval: TimeInterval = 5
+  private var reconnectTask: Task<Void, Never>?
 
   init(
     baseURL: URL = URL(string: "http://127.0.0.1:8080")!,
-    courseID: String = "course-123"
+    courseID: String = "cmjpyww020000nocz1nry3ywm"
   ) {
     self.baseURL = baseURL
     self.courseID = courseID
@@ -85,6 +83,10 @@ final class ControllerViewModel: ObservableObject {
   }
 
   func loadInitialPresentation() async {
+    await loadInitialPresentation(triggerReconnectOnFailure: true)
+  }
+
+  private func loadInitialPresentation(triggerReconnectOnFailure: Bool) async {
     status = .loading
 
     do {
@@ -107,19 +109,23 @@ final class ControllerViewModel: ObservableObject {
       }
 
       let payload = try JSONDecoder().decode(PresentationResponse.self, from: data)
-      guard let activeSlide = payload.slides.first(where: { $0.index == payload.activeSlideIndex }) else {
+      courseID = payload.courseId
+      // "Seminar starten" muss immer die erste Folie zeigen.
+      guard let firstSlide = payload.slides.first(where: { $0.index == 0 }) ?? payload.slides.first else {
         throw URLError(.cannotParseResponse)
       }
 
       presentationID = payload.presentationId
-      currentSlideIndex = payload.activeSlideIndex
-      currentSlideTitle = activeSlide.title ?? activeSlide.fileName
-      slidePositionText = "\(payload.activeSlideIndex + 1) / \(payload.slideCount)"
-      currentNotes = activeSlide.notes
-      currentSlideHTML = try await fetchSlideHTML(from: activeSlide.htmlURL)
+      currentSlideIndex = firstSlide.index
+      slideCount = payload.slideCount
+      currentSlideTitle = firstSlide.title ?? firstSlide.fileName
+      slidePositionText = "\(firstSlide.index + 1) / \(payload.slideCount)"
+      currentNotes = firstSlide.notes
+      currentSlideHTML = try await fetchSlideHTML(from: firstSlide.htmlURL)
       status = .ready
     } catch {
-      applyLocalDemoPresentation()
+      status = .failed(message: "Aither-Präsentation konnte nicht geladen werden.")
+      if triggerReconnectOnFailure { startReconnectLoop() }
     }
   }
 
@@ -127,20 +133,24 @@ final class ControllerViewModel: ObservableObject {
     status = .loading
 
     do {
-      if presentationID == "local-demo" {
-        try navigateLocalDemo(command: command)
-        status = .ready
-        return
-      }
-
       guard let presentationID else {
         throw URLError(.userAuthenticationRequired)
       }
 
-      var request = URLRequest(url: baseURL.appendingPathComponent("api/controller/navigation"))
-      request.httpMethod = "POST"
-      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      // Build the endpoint URL once, including query items.
+      let endpoint = baseURL.appendingPathComponent("api/controller/navigation")
+      guard var components = URLComponents(
+        url: endpoint,
+        resolvingAgainstBaseURL: false
+      ) else {
+        throw URLError(.badURL)
+      }
+      components.queryItems = [URLQueryItem(name: "courseId", value: courseID)]
+      guard let endpointURL = components.url else {
+        throw URLError(.badURL)
+      }
 
+      // Create a single URLRequest with the resolved endpoint.
       let payload: [String: Any] = [
         "presentationId": presentationID,
         "command": command.rawValue,
@@ -148,6 +158,9 @@ final class ControllerViewModel: ObservableObject {
         "requestId": UUID().uuidString,
       ]
 
+      var request = URLRequest(url: endpointURL)
+      request.httpMethod = "POST"
+      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
       request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
       let (data, response) = try await session.data(for: request)
@@ -158,91 +171,19 @@ final class ControllerViewModel: ObservableObject {
       let navigation = try JSONDecoder().decode(NavigationResponse.self, from: data)
       currentSlideIndex = navigation.activeSlideIndex
       currentSlideTitle = navigation.slide.title ?? navigation.slide.fileName
+      // Guard against slideCount == 0 (e.g. navigation before a presentation
+      // loaded, or a malformed manifest) to avoid nonsensical "x / 0" output.
+      slidePositionText = slideCount > 0
+        ? "\(navigation.activeSlideIndex + 1) / \(slideCount)"
+        : "-- / --"
       currentNotes = navigation.slide.notes
       currentSlideHTML = try await fetchSlideHTML(from: navigation.slide.htmlURL)
 
       status = .ready
     } catch {
       status = .failed(message: "Controller-Navigation fehlgeschlagen.")
+      startReconnectLoop()
     }
-  }
-
-  private func applyLocalDemoPresentation() {
-    demoSlides = [
-      DemoSlide(
-        title: "Offline-Vorschau",
-        html: """
-        <html>
-          <head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head>
-          <body style=\"margin:0;font-family:-apple-system,Helvetica,sans-serif;background:#f3f4f6;color:#111827;display:flex;align-items:center;justify-content:center;height:100vh;\">
-            <div style=\"max-width:900px;padding:24px;text-align:center;\">
-              <p style=\"margin:0 0 8px 0;font-size:18px;letter-spacing:0.04em;text-transform:uppercase;color:#0f766e;\">Offline-Vorschau</p>
-              <h1 style=\"margin:0;font-size:48px;line-height:1.1;\">Gaia-Controller-Layout</h1>
-            </div>
-          </body>
-        </html>
-        """,
-        notes: "Lokale Demo aktiv: Bridge-Endpunkt nicht erreichbar."
-      ),
-      DemoSlide(
-        title: "Navigationsvorschau",
-        html: """
-        <html>
-          <head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head>
-          <body style=\"margin:0;font-family:-apple-system,Helvetica,sans-serif;background:#111827;color:#f9fafb;display:flex;align-items:center;justify-content:center;height:100vh;\">
-            <div style=\"max-width:900px;padding:24px;text-align:center;\">
-              <h2 style=\"margin:0 0 12px 0;font-size:42px;\">Navigationsvorschau</h2>
-              <p style=\"margin:0;font-size:24px;color:#cbd5e1;\">Weiter / Zurück wechselt die lokalen Demo-Slides</p>
-            </div>
-          </body>
-        </html>
-        """,
-        notes: "Tipp: Mit Weiter / Zurück kannst du den Button-Ablauf prüfen."
-      ),
-      DemoSlide(
-        title: "Controller bereit",
-        html: """
-        <html>
-          <head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\" /></head>
-          <body style=\"margin:0;font-family:-apple-system,Helvetica,sans-serif;background:linear-gradient(135deg,#fee2e2,#dbeafe);color:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;\">
-            <div style=\"max-width:900px;padding:24px;text-align:center;\">
-              <h2 style=\"margin:0 0 12px 0;font-size:42px;\">Controller bereit</h2>
-              <p style=\"margin:0;font-size:24px;\">Sobald der Server läuft, ersetzt Live-Inhalt diese Vorschau.</p>
-            </div>
-          </body>
-        </html>
-        """,
-        notes: "Wenn GaiaAuthenticationApp auf :8080 läuft, wird automatisch Live-Content geladen."
-      ),
-    ]
-
-    presentationID = "local-demo"
-    currentSlideIndex = 0
-    currentSlideTitle = demoSlides[0].title
-    slidePositionText = "1 / \(demoSlides.count)"
-    currentSlideHTML = demoSlides[0].html
-    currentNotes = demoSlides[0].notes
-    status = .ready
-  }
-
-  private func navigateLocalDemo(command: NavigationCommandKind) throws {
-    guard !demoSlides.isEmpty else {
-      throw URLError(.cannotParseResponse)
-    }
-
-    let nextIndex: Int
-    switch command {
-    case .previous:
-      nextIndex = max(0, currentSlideIndex - 1)
-    case .next:
-      nextIndex = min(demoSlides.count - 1, currentSlideIndex + 1)
-    }
-
-    currentSlideIndex = nextIndex
-  currentSlideTitle = demoSlides[nextIndex].title
-    slidePositionText = "\(nextIndex + 1) / \(demoSlides.count)"
-    currentSlideHTML = demoSlides[nextIndex].html
-    currentNotes = demoSlides[nextIndex].notes
   }
 
   private func fetchSlideHTML(from htmlURL: String) async throws -> String {
@@ -277,6 +218,25 @@ final class ControllerViewModel: ObservableObject {
     return baseURL
       .appendingPathComponent("api/controller/slides")
       .appendingPathComponent(htmlURL)
+  }
+
+  // MARK: - Auto-Reconnect (alle 5s bis Verbindung wiederhergestellt)
+
+  private func startReconnectLoop() {
+    reconnectTask?.cancel()
+    reconnectTask = Task { [weak self] in
+      while !Task.isCancelled {
+        try? await Task.sleep(nanoseconds: UInt64(Self.reconnectInterval * 1_000_000_000))
+        guard let self, !Task.isCancelled else { return }
+        await self.loadInitialPresentation(triggerReconnectOnFailure: false)
+        if self.status == .ready { return }
+      }
+    }
+  }
+
+  private func stopReconnectLoop() {
+    reconnectTask?.cancel()
+    reconnectTask = nil
   }
 }
 #endif

@@ -22,19 +22,13 @@ private let server = try AuthenticationHTTPServer(configuration: configuration, 
 try server.start()
 
 private struct AuthenticationAppConfiguration {
-  private enum RuntimeEnvironment {
-    case development
-    case test
-    case production
-  }
-
   let host: String
   let port: UInt16
   let baseURL: URL
   let aitherBaseURL: URL
   let controllerDefaultCourseID: String
   let seedControllerDevelopmentSession: Bool
-  private let runtimeEnvironment: RuntimeEnvironment
+  private let runtimeEnvironment: LocalEnvironment.RuntimeEnvironment
   let hemeraToken: String?
   let aitherToken: String?
 
@@ -68,17 +62,12 @@ private struct AuthenticationAppConfiguration {
       self.baseURL = baseURL
     }
 
-    if let aitherBaseURLString = environment["GAIA_AITHER_BASE_URL"]
-      ?? environment["AITHER_BASE_URL"],
-      let aitherBaseURL = URL(string: aitherBaseURLString)
-    {
-      self.aitherBaseURL = aitherBaseURL
-    } else {
-      guard let defaultAitherBaseURL = URL(string: "http://127.0.0.1:3000") else {
-        throw AuthenticationError.unsafeFailure(reason: "invalid_aither_base_url")
-      }
-      self.aitherBaseURL = defaultAitherBaseURL
-    }
+    runtimeEnvironment = LocalEnvironment.runtimeEnvironment(in: environment)
+    aitherBaseURL = try LocalEnvironment.preferredServiceBaseURL(
+      .aither,
+      in: environment,
+      runtimeEnvironment: runtimeEnvironment
+    )
 
     if let configuredCourseID = environment["GAIA_CONTROLLER_COURSE_ID"],
       !configuredCourseID.isEmpty
@@ -88,10 +77,12 @@ private struct AuthenticationAppConfiguration {
       controllerDefaultCourseID = "course-123"
     }
 
-    seedControllerDevelopmentSession = Self.parseBooleanEnvironmentValue(
-      environment["GAIA_SEED_CONTROLLER_DEV_SESSION"]
+    seedControllerDevelopmentSession = Self.resolveSeedControllerDevelopmentSession(
+      configuredValue: environment["GAIA_SEED_CONTROLLER_DEV_SESSION"],
+      runtimeEnvironment: runtimeEnvironment,
+      host: host,
+      baseURL: baseURL
     )
-    runtimeEnvironment = Self.resolveRuntimeEnvironment(from: environment)
 
     hemeraToken = environment["HEMERA_SERVICE_API_KEY"] ?? environment["HEMERA_SERVICE_TOKEN"]
     aitherToken = environment["AITHER_SYNC_TOKEN"] ?? environment["AITHER_SERVICE_TOKEN"]
@@ -210,39 +201,25 @@ private struct AuthenticationAppConfiguration {
     }
   }
 
-  private static func resolveRuntimeEnvironment(from environment: [String: String])
-    -> RuntimeEnvironment
-  {
-    if environment["XCTestConfigurationFilePath"] != nil || environment["GAIA_TEST"] == "1" {
-      return .test
+  private static func resolveSeedControllerDevelopmentSession(
+    configuredValue: String?,
+    runtimeEnvironment: LocalEnvironment.RuntimeEnvironment,
+    host: String,
+    baseURL: URL
+  ) -> Bool {
+    if configuredValue != nil {
+      return parseBooleanEnvironmentValue(configuredValue)
     }
 
-    for key in ["GAIA_ENV", "ROLLBAR_ENVIRONMENT", "ENVIRONMENT"] {
-      guard
-        let value = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines)
-          .lowercased(),
-        !value.isEmpty
-      else {
-        continue
-      }
-
-      switch value {
-      case "dev", "development", "local":
-        return .development
-      case "test", "testing":
-        return .test
-      case "prod", "production":
-        return .production
-      default:
-        continue
-      }
+    // Default to an authenticated local controller session for loopback-only
+    // development runs to keep simulator startup friction-free.
+    // Explicitly configured GAIA_SEED_CONTROLLER_DEV_SESSION=true still works
+    // above; this default path only applies in development (not test/CI).
+    guard runtimeEnvironment == .development else {
+      return false
     }
 
-    #if DEBUG
-      return .development
-    #else
-      return .production
-    #endif
+    return isLoopbackHost(host) && isLoopbackHost(baseURL.host)
   }
 
   private static func isLoopbackHost(_ host: String?) -> Bool {

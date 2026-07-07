@@ -81,7 +81,7 @@ final class DashboardViewModel: ObservableObject {
     self.decoder = decoder
   }
 
-  func loadDashboard(courseID: String = "course-123") async {
+  func loadDashboard(courseID: String = "cmjpyww020000nocz1nry3ywm") async {
     status = .loading
 
     do {

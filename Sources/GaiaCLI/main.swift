@@ -207,16 +207,11 @@ struct ServiceCheckCommand {
   static let usage =
     "Usage: swift run GaiaCLI service-check [--hemera-base-url <url>] [--aither-base-url <url>] [--json|-j]"
 
-  static func parse(arguments: [String]) throws -> ServiceCheckCommand {
-    guard let defaultHemeraBaseURL = URL(string: "http://127.0.0.1:3000") else {
-      throw GaiaCLIError.invalidUsage(usage)
-    }
-    guard let defaultAitherBaseURL = URL(string: "http://127.0.0.1:3500") else {
-      throw GaiaCLIError.invalidUsage(usage)
-    }
-
-    var hemeraBaseURL = defaultHemeraBaseURL
-    var aitherBaseURL = defaultAitherBaseURL
+  internal static func parse(arguments: [String], environment: [String: String]) throws
+    -> ServiceCheckCommand
+  {
+    var hemeraOverride: URL?
+    var aitherOverride: URL?
     var index = 1
 
     while index < arguments.count {
@@ -231,18 +226,25 @@ struct ServiceCheckCommand {
         guard let url = URL(string: value) else {
           throw GaiaCLIError.invalidUsage(usage)
         }
-        hemeraBaseURL = url
+        hemeraOverride = url
       case "--aither-base-url":
         guard let url = URL(string: value) else {
           throw GaiaCLIError.invalidUsage(usage)
         }
-        aitherBaseURL = url
+        aitherOverride = url
       default:
         throw GaiaCLIError.invalidUsage(usage)
       }
 
       index += 2
     }
+
+    let hemeraBaseURL =
+      try hemeraOverride
+      ?? LocalEnvironment.preferredServiceBaseURL(.hemera, in: environment)
+    let aitherBaseURL =
+      try aitherOverride
+      ?? LocalEnvironment.preferredServiceBaseURL(.aither, in: environment)
 
     return ServiceCheckCommand(
       hemeraBaseURL: hemeraBaseURL,
@@ -378,7 +380,17 @@ func makeServiceStatus(
   )
 }
 
-func runServiceCheck(command: ServiceCheckCommand) async throws -> ServiceCheckResult {
+/// Runs the service health-check for Hemera and Aither, returning structured results.
+///
+/// - Parameters:
+///   - command: The parsed service-check command carrying resolved base URLs.
+///   - environment: The merged environment dictionary used for credential resolution
+///     and authentication runtime construction.
+/// - Returns: A `ServiceCheckResult` with per-service status, auth state, and metadata.
+internal func runServiceCheck(
+  command: ServiceCheckCommand,
+  environment: [String: String]
+) async throws -> ServiceCheckResult {
   let runtime = try makeServiceCheckRuntime(environment: environment)
   let client = DownstreamServiceClient(runtime: runtime)
   let now = Date()
@@ -549,8 +561,8 @@ do {
       }
     }
   case "service-check":
-    let command = try ServiceCheckCommand.parse(arguments: arguments)
-    let result = try await runServiceCheck(command: command)
+    let command = try ServiceCheckCommand.parse(arguments: arguments, environment: environment)
+    let result = try await runServiceCheck(command: command, environment: environment)
 
     if jsonOutput {
       try printJSON(result)

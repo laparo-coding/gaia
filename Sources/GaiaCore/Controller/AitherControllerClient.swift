@@ -32,6 +32,7 @@ public struct AitherControllerClient: Sendable {
 
   private struct NavigationResponse: Decodable {
     let presentationId: String
+    let courseId: String?
     let activeSlideIndex: Int
     let fileName: String
     let noteTitle: String?
@@ -111,19 +112,25 @@ public struct AitherControllerClient: Sendable {
     }
   }
 
+  /// Navigates from the current slide to the next/previous slide using Aither.
+  ///
+  /// - Parameters:
+  ///   - command: Navigation intent with presentation ID, direction and source index.
+  ///   - courseID: Canonical course identifier used as fallback when the upstream
+  ///     navigation response omits `courseId`.
+  ///   - requestID: Correlation identifier for tracing and telemetry.
+  ///   - now: Timestamp used for downstream authorization and diagnostics.
+  /// - Returns: `AuthorizedRequestResult<ControllerSlide>`. On success, `value`
+  ///   contains the resolved slide including authoritative `courseID` /
+  ///   `presentationID` when provided by upstream. If navigation cannot be
+  ///   performed, `value` is `nil` and `error` is populated.
   public func navigate(
     command: NavigationCommand,
+    courseID: String,
     requestID: String,
     now: Date = Date()
   ) async -> AuthorizedRequestResult<ControllerSlide> {
-    let body = NavigationRequest(
-      presentationId: command.presentationID,
-      command: command.command.rawValue,
-      fromIndex: command.fromIndex,
-      requestId: requestID
-    )
-
-    guard let payload = try? JSONEncoder().encode(body) else {
+    guard let payload = makeNavigationPayload(command: command, requestID: requestID) else {
       return AuthorizedRequestResult(
         value: nil,
         authorization: nil,
@@ -141,6 +148,30 @@ public struct AitherControllerClient: Sendable {
       body: payload,
       now: now
     )
+
+    return decodeNavigationResult(
+      upstream,
+      fallbackCourseID: courseID
+    )
+  }
+
+  private func makeNavigationPayload(
+    command: NavigationCommand,
+    requestID: String
+  ) -> Data? {
+    let body = NavigationRequest(
+      presentationId: command.presentationID,
+      command: command.command.rawValue,
+      fromIndex: command.fromIndex,
+      requestId: requestID
+    )
+    return try? JSONEncoder().encode(body)
+  }
+
+  private func decodeNavigationResult(
+    _ upstream: AuthorizedRequestResult<DownstreamServiceResponse>,
+    fallbackCourseID: String
+  ) -> AuthorizedRequestResult<ControllerSlide> {
 
     if let error = upstream.error {
       return AuthorizedRequestResult(
@@ -161,7 +192,12 @@ public struct AitherControllerClient: Sendable {
     do {
       let payload = try decoder.decode(
         SuccessEnvelope<NavigationResponse>.self, from: response.body)
-      let slide = try mapSlide(payload.data)
+      let resolvedCourseID = payload.data.courseId ?? fallbackCourseID
+      let slide = try mapSlide(
+        payload.data,
+        courseID: resolvedCourseID,
+        presentationID: payload.data.presentationId
+      )
       return AuthorizedRequestResult(
         value: slide,
         authorization: upstream.authorization,
@@ -229,7 +265,9 @@ public struct AitherControllerClient: Sendable {
   }
 
   private func mapManifest(_ response: ManifestResponse) throws -> ControllerManifest {
-    let slides = try response.slides.map { try mapSlide($0) }
+    let slides = try response.slides.map {
+      try mapSlide($0, courseID: response.courseId, presentationID: response.presentationId)
+    }
     return try ControllerManifest(
       courseID: response.courseId,
       presentationID: response.presentationId,
@@ -241,8 +279,12 @@ public struct AitherControllerClient: Sendable {
     )
   }
 
-  private func mapSlide(_ response: ManifestResponse.SlideResponse) throws -> ControllerSlide {
-    let htmlURL = makeBridgeSlideURL(fileName: response.fileName)
+  private func mapSlide(
+    _ response: ManifestResponse.SlideResponse,
+    courseID: String,
+    presentationID: String? = nil
+  ) throws -> ControllerSlide {
+    let htmlURL = makeBridgeSlideURL(fileName: response.fileName, courseID: courseID)
 
     let notes: String
 
@@ -265,14 +307,22 @@ public struct AitherControllerClient: Sendable {
       htmlURL: htmlURL,
       notes: notes,
       notesSource: notesSource,
-      title: response.noteTitle,
       contentState: .ready,
-      etag: nil
+      metadata: .init(
+        courseID: courseID,
+        presentationID: presentationID,
+        title: response.noteTitle,
+        etag: nil
+      )
     )
   }
 
-  private func mapSlide(_ response: NavigationResponse) throws -> ControllerSlide {
-    let htmlURL = makeBridgeSlideURL(fileName: response.fileName)
+  private func mapSlide(
+    _ response: NavigationResponse,
+    courseID: String,
+    presentationID: String
+  ) throws -> ControllerSlide {
+    let htmlURL = makeBridgeSlideURL(fileName: response.fileName, courseID: courseID)
 
     let notes: String
 
@@ -295,16 +345,34 @@ public struct AitherControllerClient: Sendable {
       htmlURL: htmlURL,
       notes: notes,
       notesSource: notesSource,
-      title: response.noteTitle,
       contentState: .ready,
-      etag: nil
+      metadata: .init(
+        courseID: courseID,
+        presentationID: presentationID,
+        title: response.noteTitle,
+        etag: nil
+      )
     )
   }
 
-  private func makeBridgeSlideURL(fileName: String) -> URL {
-    bridgeBaseURL
-      .appendingPathComponent("api/controller/slides")
-      .appendingPathComponent(fileName)
+  private func makeBridgeSlideURL(fileName: String, courseID: String) -> URL {
+    let slidePath = "api/controller/slides"
+    guard
+      var components = URLComponents(
+        url: bridgeBaseURL.appendingPathComponent(slidePath).appendingPathComponent(fileName),
+        resolvingAgainstBaseURL: false
+      )
+    else {
+      return bridgeBaseURL.appendingPathComponent(slidePath).appendingPathComponent(fileName)
+    }
+    // Preserve any query items already present on the resolved URL (e.g. from
+    // bridgeBaseURL) and append/replace `courseId` without clobbering them.
+    var queryItems = components.queryItems ?? []
+    queryItems.removeAll { $0.name == "courseId" }
+    queryItems.append(URLQueryItem(name: "courseId", value: courseID))
+    components.queryItems = queryItems
+    return components.url
+      ?? bridgeBaseURL.appendingPathComponent(slidePath).appendingPathComponent(fileName)
   }
 
   private func encodedQueryValue(_ value: String) -> String {
