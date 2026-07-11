@@ -69,3 +69,5 @@ prisma/dev.db*
 .rollbar-mcp.json
 
 #Ignore vscode AI rules
+
+.github/instructions/codacy.instructions.md
