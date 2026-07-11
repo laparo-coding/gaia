@@ -1,17 +1,9 @@
 ---
-    description: Configuration for AI behavior when interacting with Codacy's MCP Server
-    applyTo: '**'
----
+description: Configuration for AI behavior when interacting with Codacy's MCP Server
+applyTo: '**'
 ---
 # Codacy Rules
 Configuration for AI behavior when interacting with Codacy's MCP Server
-
-## using any tool that accepts the arguments: `provider`, `organization`, or `repository`
-- ALWAYS use:
- - provider: gh
- - organization: Laparo-coding
- - repository: gaia
-- Avoid calling `git remote -v` unless really necessary
 
 ## CRITICAL: After ANY successful `edit_file` or `reapply` operation
 - YOU MUST IMMEDIATELY run the `codacy_cli_analyze` tool from Codacy's MCP Server for each file that was edited, with:
@@ -32,8 +24,8 @@ Configuration for AI behavior when interacting with Codacy's MCP Server
 
 ## When there are no Codacy MCP Server tools available, or the MCP Server is not reachable
 - Suggest the user the following troubleshooting steps:
- - Try to reset the MCP on the extension
- - If the user is using VSCode, suggest them to review their Copilot > MCP settings in Github, under their organization or personal account. Refer them to Settings > Copilot > Enable MCP servers in Copilot. Suggested URL (https://github.com/settings/copilot/features) or https://github.com/organizations/{organization-name}/settings/copilot/features (This can only be done by organizations admins / owners)
+    - Try to reset the MCP on the extension
+    - If the user is using VSCode, suggest them to review their Copilot > MCP settings in GitHub, under their organization or personal account. Refer them to Settings > Copilot > Enable MCP servers in Copilot. Suggested URL (https://github.com/settings/copilot/features) or https://github.com/organizations/laparo-coding/settings/copilot/features (This can only be done by their organization admins / owners)
 - If none of the above steps work, suggest the user to contact Codacy support
 
 ## Trying to call a tool that needs a rootPath as a parameter
@@ -58,14 +50,14 @@ Configuration for AI behavior when interacting with Codacy's MCP Server
 - EXAMPLE:
  - After: npm install react-markdown
  - Do: Run codacy_cli_analyze with trivy
- - Before: Continuing with other tasks
+ - Before: Continuing with any other tasks
 
 ## General
 - Repeat the relevant steps for each modified file.
 - "Propose fixes" means to both suggest and, if possible, automatically apply the fixes.
 - You MUST NOT wait for the user to ask for analysis or remind you to run the tool.
 - Do not run `codacy_cli_analyze` looking for changes in duplicated code or code complexity metrics.
-- Complexity metrics are different from complexity issues. When trying to fix complexity in a repository or code file, focus on solving the complexity issues and ignore the complexity metric.
+- Complexity metrics are different from complexity issues. When trying to fix complexity in a repository or file, focus on solving the complexity issues and ignore the complexity metric.
 - Do not run `codacy_cli_analyze` looking for changes in code coverage.
 - Do not try to manually install Codacy CLI using either brew, npm, npx, or any other package manager.
 - If the Codacy CLI is not installed, just run the `codacy_cli_analyze` tool from Codacy's MCP Server.
@@ -76,4 +68,3 @@ Configuration for AI behavior when interacting with Codacy's MCP Server
 - If the user accepts, run the `codacy_setup_repository` tool
 - Do not ever try to run the `codacy_setup_repository` tool on your own
 - After setup, immediately retry the action that failed (only retry once)
----
