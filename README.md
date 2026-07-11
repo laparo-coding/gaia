@@ -40,6 +40,12 @@ will fail with an insufficient privileges response from Rollbar's ingest API.
 If Gaia later gains a real client-facing app target, that target must use a
 client-side Rollbar token such as `post_client_item` via a separate client-safe
 configuration path.
+On macOS you can validate the token against Rollbar and store it in Keychain:
+
+```bash
+bash scripts/rollbar-keychain-setup.sh
+```
+
 For short-lived processes such as `GaiaCLI`, Gaia waits 1 second on shutdown so
 the Rollbar Apple SDK can finish async delivery. Override this with
 `GAIA_ROLLBAR_DELIVERY_WAIT_SECONDS` or `ROLLBAR_DELIVERY_WAIT_SECONDS` if you
