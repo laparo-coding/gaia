@@ -7,11 +7,12 @@ FALLBACK_ENV_KEY="ROLLBAR_ACCESS_TOKEN"
 PROJECT_NAME="gaia"
 KEYCHAIN_SERVICE="rollbar-gaia-post-server-item"
 DEFAULT_ENV_FILE=".env.local"
+CURRENT_USER="${USER:-$(id -un 2>/dev/null || echo "$UID")}"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/rollbar-keychain-setup.sh [--token TOKEN] [--env-file PATH] [--keychain-service NAME]
+  scripts/rollbar-keychain-setup.sh [--token TOKEN] [--env-file PATH] [--keychain-service NAME] [--non-interactive]
 
 Description:
   1) Liest den Rollbar Server-Token (gaia) aus --token, Env oder Env-Datei.
@@ -20,16 +21,28 @@ Description:
 
 Token-Reihenfolge:
   --token > $GAIA_ROLLBAR_ACCESS_TOKEN > $ROLLBAR_ACCESS_TOKEN > Env-Datei > interaktive Eingabe
+
+Optionen:
+  --non-interactive    Keine interaktive Eingabe; Fehler, wenn kein Token gefunden wird.
 EOF
 }
 
+# Strip surrounding quotes and whitespace from a token value.
 trim_token() {
   local value="$1"
-  value="${value#\"}"
-  value="${value%\"}"
-  value="${value#\'}"
-  value="${value%\'}"
-  printf '%s' "$(printf '%s' "$value" | tr -d '[:space:]')"
+  # Remove surrounding whitespace first
+  value="$(printf '%s' "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  # Strip one pair of surrounding double quotes
+  if [[ "$value" == \"*\" ]]; then
+    value="${value#\"}"
+    value="${value%\"}"
+  fi
+  # Strip one pair of surrounding single quotes
+  if [[ "$value" == \'*\' ]]; then
+    value="${value#\'}"
+    value="${value%\'}"
+  fi
+  printf '%s' "$value"
 }
 
 read_from_env_file() {
@@ -40,13 +53,15 @@ read_from_env_file() {
   fi
 
   local line
-  line=$(grep -E "^[[:space:]]*${key}=" "$env_file" | tail -n 1 || true)
+  # Match KEY= or KEY ="..." or KEY = value (whitespace around = allowed)
+  line=$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$env_file" | tail -n 1 || true)
   if [[ -z "$line" ]]; then
     return 1
   fi
 
   local raw
   raw="${line#*=}"
+  # Strip inline comments (only when preceded by whitespace or start)
   raw="${raw%%#*}"
   trim_token "$raw"
 }
@@ -63,8 +78,20 @@ assert_dependencies() {
   fi
 }
 
+# Escape a string for safe inclusion in a JSON string value.
+json_escape() {
+  local s="$1"
+  s="${s//\\/\\\\}"    # backslash
+  s="${s//\"/\\\"}"     # double quote
+  s="${s//$'\n'/\\n}"   # newline
+  s="${s//$'\r'/\\r}"   # carriage return
+  s="${s//$'\t'/\\t}"   # tab
+  printf '%s' "$s"
+}
+
 TOKEN=""
 ENV_FILE="$DEFAULT_ENV_FILE"
+NON_INTERACTIVE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -79,6 +106,10 @@ while [[ $# -gt 0 ]]; do
     --keychain-service)
       KEYCHAIN_SERVICE="${2:-}"
       shift 2
+      ;;
+    --non-interactive)
+      NON_INTERACTIVE="1"
+      shift
       ;;
     -h|--help)
       usage
@@ -111,6 +142,10 @@ if [[ -z "$TOKEN" ]]; then
 fi
 
 if [[ -z "$TOKEN" ]]; then
+  if [[ -n "$NON_INTERACTIVE" ]]; then
+    echo "Fehler: Kein Token gefunden und --non-interactive gesetzt." >&2
+    exit 1
+  fi
   read -r -s -p "Rollbar post_server_item Token fuer ${PROJECT_NAME} eingeben: " TOKEN
   echo ""
 fi
@@ -122,8 +157,10 @@ if [[ -z "$TOKEN" ]]; then
   exit 1
 fi
 
+escaped_token="$(json_escape "$TOKEN")"
+escaped_project="$(json_escape "$PROJECT_NAME")"
 payload=$(cat <<EOF
-{"access_token":"${TOKEN}","data":{"environment":"development","level":"info","body":{"message":{"body":"${PROJECT_NAME} keychain setup probe"}}}}
+{"access_token":"${escaped_token}","data":{"environment":"development","level":"info","body":{"message":{"body":"${escaped_project} keychain setup probe"}}}}
 EOF
 )
 
@@ -135,8 +172,8 @@ if ! printf '%s' "$response" | tr -d '[:space:]' | grep -q '"err":0'; then
   exit 1
 fi
 
-security add-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w "$TOKEN" -U >/dev/null
-stored_token=$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w)
+security add-generic-password -a "$CURRENT_USER" -s "$KEYCHAIN_SERVICE" -w "$TOKEN" -U >/dev/null
+stored_token=$(security find-generic-password -a "$CURRENT_USER" -s "$KEYCHAIN_SERVICE" -w)
 
 if [[ "$stored_token" != "$TOKEN" ]]; then
   echo "Fehler: Token konnte nicht korrekt aus der Keychain gelesen werden." >&2
@@ -148,4 +185,4 @@ echo "Token wurde in der Keychain gespeichert."
 echo "Service: $KEYCHAIN_SERVICE"
 echo ""
 echo "Optional fuer die aktuelle Shell:"
-echo "export GAIA_ROLLBAR_ACCESS_TOKEN=\"\$(security find-generic-password -a \"$USER\" -s \"$KEYCHAIN_SERVICE\" -w)\""
+echo "export GAIA_ROLLBAR_ACCESS_TOKEN=\"\$(security find-generic-password -a \"$CURRENT_USER\" -s \"$KEYCHAIN_SERVICE\" -w)\""
