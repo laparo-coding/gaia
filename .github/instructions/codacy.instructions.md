@@ -5,6 +5,13 @@ applyTo: '**'
 # Codacy Rules
 Configuration for AI behavior when interacting with Codacy's MCP Server
 
+## Default provider, organization, and repository
+- When calling Codacy tools that accept `provider`, `organization`, or `repository` parameters, ALWAYS use these defaults:
+  - `provider`: `gh`
+  - `organization`: `laparo-coding`
+  - `repository`: `gaia`
+- Only override these values if the user explicitly requests a different target.
+
 ## CRITICAL: After ANY successful `edit_file` or `reapply` operation
 - YOU MUST IMMEDIATELY run the `codacy_cli_analyze` tool from Codacy's MCP Server for each file that was edited, with:
  - `rootPath`: set to the workspace path
