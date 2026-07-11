@@ -1,0 +1,8 @@
+{
+  "projects": [
+    {
+      "name": "gaia",
+      "token": "REPLACE_WITH_GAIA_ROLLBAR_POST_SERVER_ITEM_TOKEN"
+    }
+  ]
+}

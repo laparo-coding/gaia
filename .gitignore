@@ -65,5 +65,7 @@ skills-lock.json
 # Prisma
 prisma/dev.db*
 
+# Rollbar MCP (local token config — keep .example committed)
+.rollbar-mcp.json
 
 #Ignore vscode AI rules

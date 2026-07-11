@@ -16,6 +16,18 @@
 			"type": "stdio",
 			"command": "bash",
 			"args": ["${workspaceFolder}/.vscode/codacy-mcp.sh", "${workspaceFolder}/.env.local"]
+		},
+		"rollbar": {
+			"type": "stdio",
+			"command": "npx",
+			"args": ["-y", "@rollbar/mcp-server@latest"],
+			"env": {
+				"ROLLBAR_CONFIG_FILE": "${workspaceFolder}/.rollbar-mcp.json"
+			}
+		},
+		"clerk": {
+			"type": "http",
+			"url": "https://mcp.clerk.com/mcp"
 		}
 	},
 	"inputs": [
