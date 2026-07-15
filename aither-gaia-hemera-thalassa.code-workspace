@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "../thalassa"
+		},
+		{
+			"path": "../hemera"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../aither"
+		},
+		{
+			"path": "../uranos"
+		}
+	],
+	"settings": {
+		"chat.defaultModel": "openrouter/OpenRouter/z-ai/glm-5.2"
+	}
+}
