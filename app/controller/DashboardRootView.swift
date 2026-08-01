@@ -7,6 +7,7 @@ import GaiaCore
 struct DashboardRootView: View {
   @ObservedObject var viewModel: DashboardViewModel
   let startSeminar: () -> Void
+  var playVideo: (() -> Void)? = nil
 
   var body: some View {
     VStack(spacing: DashboardDesignTokens.Spacing.xl) {
@@ -56,6 +57,18 @@ struct DashboardRootView: View {
       .clipShape(RoundedRectangle(cornerRadius: DashboardDesignTokens.CornerRadius.inner, style: .continuous))
       .disabled(!viewModel.canStartSeminar)
       .opacity(viewModel.canStartSeminar ? 1 : 0.6)
+
+      if let playVideo = playVideo {
+        Button("Video abspielen") {
+          playVideo()
+        }
+        .font(.headline)
+        .padding(.horizontal, DashboardDesignTokens.Spacing.xl)
+        .padding(.vertical, DashboardDesignTokens.Spacing.md)
+        .background(Color.black.opacity(0.08))
+        .foregroundStyle(Color.primary)
+        .clipShape(RoundedRectangle(cornerRadius: DashboardDesignTokens.CornerRadius.inner, style: .continuous))
+      }
     }
   }
 

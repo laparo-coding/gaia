@@ -3,6 +3,10 @@ import Foundation
 public struct DownstreamServiceResponse: Equatable, Sendable {
   public let service: DownstreamService
   public let statusCode: Int
+  /// The final URL after any HTTP redirects.
+  /// Excluded from `Equatable` equality: redirect destinations can vary across
+  /// environments (e.g. CDN hostnames) and would make comparisons flaky.
+  public let url: URL?
   public let body: Data
   public let headers: [String: String]
   public let attempt: Int
@@ -10,15 +14,25 @@ public struct DownstreamServiceResponse: Equatable, Sendable {
   public init(
     service: DownstreamService,
     statusCode: Int,
+    url: URL? = nil,
     body: Data,
     headers: [String: String],
     attempt: Int
   ) {
     self.service = service
     self.statusCode = statusCode
+    self.url = url
     self.body = body
     self.headers = headers
     self.attempt = attempt
+  }
+
+  public static func == (lhs: DownstreamServiceResponse, rhs: DownstreamServiceResponse) -> Bool {
+    lhs.service == rhs.service
+      && lhs.statusCode == rhs.statusCode
+      && lhs.body == rhs.body
+      && lhs.headers == rhs.headers
+      && lhs.attempt == rhs.attempt
   }
 }
 
@@ -82,6 +96,7 @@ public struct DownstreamServiceClient: Sendable {
       return DownstreamServiceResponse(
         service: service,
         statusCode: httpResponse.statusCode,
+        url: httpResponse.url,
         body: data,
         headers: Self.normalizeHeaders(httpResponse),
         attempt: attempt

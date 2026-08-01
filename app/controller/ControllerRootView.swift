@@ -1,27 +1,89 @@
 #if canImport(SwiftUI)
+import GaiaCore
 import SwiftUI
 
 struct ControllerRootView: View {
   @StateObject private var dashboardViewModel = DashboardViewModel()
   @StateObject private var viewModel = ControllerViewModel()
+  @StateObject private var playbackLoader = PlaybackClientLoader()
   @State private var isPresentingSlides = false
+  @State private var isPresentingVideo = false
+  private let playbackAssetID: String?
+
+  init(playbackAssetID: String? = nil) {
+    let configuredAssetID = ProcessInfo.processInfo.environment[
+      LocalEnvironment.playbackAssetIDKey
+    ]?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let candidate = playbackAssetID ?? configuredAssetID
+    self.playbackAssetID = candidate?.isEmpty == false ? candidate : nil
+  }
 
   var body: some View {
     Group {
-      if isPresentingSlides {
+      if isPresentingVideo {
+        videoPlaybackView
+      } else if isPresentingSlides {
         presentationView
       } else {
-        DashboardRootView(viewModel: dashboardViewModel) {
-          Task {
-            viewModel.setCourseID(dashboardViewModel.snapshot.course.id)
-            await viewModel.loadInitialPresentation()
-            isPresentingSlides = true
-          }
-        }
+        DashboardRootView(
+          viewModel: dashboardViewModel,
+          startSeminar: {
+            Task {
+              viewModel.setCourseID(dashboardViewModel.snapshot.course.id)
+              await viewModel.loadInitialPresentation()
+              isPresentingSlides = true
+            }
+          },
+          playVideo: playbackAssetID != nil
+            ? { isPresentingVideo = true }
+            : nil
+        )
         .task {
           await dashboardViewModel.loadDashboard()
         }
       }
+    }
+  }
+
+  private var videoPlaybackView: some View {
+    Group {
+      if let playbackClient = playbackLoader.client, let playbackAssetID {
+        VideoPlaybackCard(
+          playbackClient: playbackClient,
+          assetId: playbackAssetID
+        )
+      } else if playbackAssetID != nil, let message = playbackLoader.configurationError {
+        VStack(spacing: 12) {
+          Image(systemName: "exclamationmark.triangle")
+            .font(.largeTitle)
+            .foregroundStyle(.secondary)
+          Text("Wiedergabe nicht verfügbar")
+            .font(.headline)
+          Text(message)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 300)
+        }
+      } else {
+        EmptyView()
+      }
+    }
+    .overlay(alignment: .topTrailing) {
+      Button {
+        isPresentingVideo = false
+      } label: {
+        Image(systemName: "xmark")
+          .font(.headline)
+          .foregroundStyle(Color.primary)
+          .frame(width: 36, height: 36)
+          .background(Color.black.opacity(0.06))
+          .clipShape(Circle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel("Video-Wiedergabe schließen")
+      .padding(.top, 18)
+      .padding(.trailing, 18)
     }
   }
 
