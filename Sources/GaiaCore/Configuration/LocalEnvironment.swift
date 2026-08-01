@@ -10,12 +10,21 @@ public enum LocalEnvironment {
   public static let defaultDashboardCacheTTL: TimeInterval = 45
   public static let defaultDashboardStatusEventsEndpoint = "/api/dashboard/status/events"
 
+  /// Environment key for the playback chapter list cache TTL in seconds (Spec 010, research R3).
+  public static let playbackChapterCacheTTLKey = "GAIA_PLAYBACK_CHAPTER_CACHE_TTL_SECONDS"
+  /// Default chapter list cache TTL: 60 seconds (short-lived, per-assetId, research R3).
+  public static let defaultPlaybackChapterCacheTTL: TimeInterval = 60
+  /// Optional recording session identifier used by the Controller playback surface.
+  public static let playbackAssetIDKey = "GAIA_PLAYBACK_ASSET_ID"
+
   /// Environment key for the Hemera service base URL (per-environment configurable, FR-009).
   public static let hemeraBaseURLKey = "GAIA_HEMERA_BASE_URL"
   /// Optional fallback Hemera base URL used in local-network / Docker hybrid setups.
   public static let hemeraFallbackBaseURLKey = "GAIA_HEMERA_FALLBACK_BASE_URL"
   /// Environment key for the Aither service base URL (per-environment configurable, FR-009).
   public static let aitherBaseURLKey = "GAIA_AITHER_BASE_URL"
+  /// Environment key for the interactive authentication base URL.
+  public static let authBaseURLKey = "GAIA_AUTH_BASE_URL"
   /// Optional fallback Aither base URL used in local-network / Docker hybrid setups.
   public static let aitherFallbackBaseURLKey = "GAIA_AITHER_FALLBACK_BASE_URL"
   /// Backwards-compatible Aither base URL key.
@@ -479,6 +488,27 @@ public enum LocalEnvironment {
     }
 
     return parsedValue
+  }
+
+  /// Minimum allowed chapter cache TTL in seconds (1 s).
+  private static let minPlaybackChapterCacheTTL: TimeInterval = 1
+  /// Maximum allowed chapter cache TTL in seconds (60 s).
+  private static let maxPlaybackChapterCacheTTL: TimeInterval = 60
+
+  /// Resolves the playback chapter list cache TTL from the environment.
+  ///
+  /// Missing or invalid values fall back to `defaultPlaybackChapterCacheTTL`.
+  /// Valid out-of-range values are clamped to the `[1, 60]` second range.
+  public static func playbackChapterCacheTTL(in environment: [String: String]) -> TimeInterval {
+    guard
+      let rawValue = environment[playbackChapterCacheTTLKey],
+      let parsedValue = Double(rawValue),
+      parsedValue > 0
+    else {
+      return defaultPlaybackChapterCacheTTL
+    }
+
+    return min(max(parsedValue, minPlaybackChapterCacheTTL), maxPlaybackChapterCacheTTL)
   }
 
   public static func dashboardStatusEventsEndpoint(in environment: [String: String]) -> String {

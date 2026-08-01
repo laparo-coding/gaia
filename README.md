@@ -13,6 +13,7 @@ package workflow is the only active root-level baseline for new work.
 - Swift test targets prepared for Swift Testing / full Xcode toolchains
 - Visual Studio Code with `swiftlang.swift-vscode` and LLDB DAP
 - Speckit structure through `.specify/` and `specs/`
+- AVFoundation / AVKit for video playback (Spec 010 — chaptered video via MUX HLS)
 
 ## Quickstart
 
@@ -23,6 +24,10 @@ swift test
 swift format lint --configuration .swift-format --strict Package.swift
 swift format lint --configuration .swift-format --strict --recursive Sources Tests app/authentication
 ```
+
+To compile SwiftPM targets for iPadOS, including C and Objective-C dependencies,
+run `scripts/ci-cd/build-ipados-swiftpm.sh`. The script forwards the iPhoneOS
+SDK path to both Swift and Clang.
 
 Rollbar is optional. Gaia initializes it automatically in both `GaiaCLI` and
 `GaiaAuthenticationApp` when `GAIA_ROLLBAR_ACCESS_TOKEN` is set. If you prefer a
@@ -79,6 +84,8 @@ Config keys (all optional):
 - `GAIA_AITHER_BASE_URL`
 - `GAIA_AITHER_FALLBACK_BASE_URL`
 - `AITHER_BASE_URL` (legacy fallback)
+- `GAIA_PLAYBACK_ASSET_ID` — Optional recording ID for controller playback.
+- `GAIA_PLAYBACK_CHAPTER_CACHE_TTL_SECONDS` — Chapter list cache TTL in seconds (default: 60).
 - `GAIA_DOCKER_RUNTIME` (`true`/`false`) for local override in tests/scripts
 
 Defaults when no URLs are configured:

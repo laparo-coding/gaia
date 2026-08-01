@@ -1,18 +1,15 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.1.0 -> 1.2.0
-  Amendment date: 2026-05-31
+  Version change: 1.4.0 -> 1.5.0
+  Amendment date: 2026-07-19
   Amendment type: MINOR
 
   Summary:
-  - Updated product requirement: Gaia app targets iPad in landscape mode only
-  - Explicitly states portrait mode support is not required
+  - Removed macOS build and test expectations from the iPadOS-only product scope
 
   Follow-up:
-  - Align repository tooling with this constitution as Swift-specific files are
-    introduced
-  - Add CI commands and editor tasks once Gaia's Swift toolchain is committed
+  - Feature specs must explicitly declare applicable validation gates
 -->
 
 # Gaia Constitution
@@ -170,11 +167,13 @@ editor-specific or IDE-only structures.
 
 ### Device and Orientation Scope
 
-- The Gaia app MUST run on iPad in landscape mode.
+- Gaia is an iPadOS-only app and MUST run on iPad in landscape mode.
+- iPhone and macOS app support are explicitly out of scope.
 - Portrait mode support is explicitly out of scope and MUST NOT be treated as a
   release blocker.
-- Any UI, layout, and interaction acceptance criteria for app features MUST be
-  validated against iPad landscape behavior first.
+- Any UI, layout, and interaction acceptance criteria MUST target iPad landscape
+  behavior. iPadOS simulator or device validation is required only when the
+  feature specification defines it as a quality gate.
 
 ### Quality Gates
 
@@ -212,4 +211,4 @@ closely enough that a contributor can reproduce failures inside VS Code.
 - If a repository practice conflicts with this constitution, the constitution
   wins until the conflict is resolved in writing.
 
-**Version**: 1.2.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-05-31
+**Version**: 1.5.0 | **Ratified**: 2026-05-29 | **Last Amended**: 2026-07-19

@@ -65,21 +65,14 @@ This report tracks planning and implementation validation artifacts for feature 
 ### iPad Landscape Validation Notes (11-inch / 13-inch)
 
 - `./scripts/ci-cd/validate-controller-ipad-build.sh`
-	- Status: blocked in current environment
-	- Notes: script now supports `VALIDATION_MODE=dual-ipad` with explicit 11-inch/13-inch targets, heartbeat logs, an `XCODEBUILD_TIMEOUT_SECONDS` fail-fast guard, and optional `SKIP_PROJECT_LIST=1` for environments where `xcodebuild -list` hangs.
-	- Blocker detail: `xcodebuild` remains stuck after `Command line invocation` for simulator destinations and does not produce further build output before manual cancellation.
-	- Diagnostic detail: `xcodebuild -list -project GaiaControllerApp.xcodeproj` also hangs, while `plutil -lint GaiaControllerApp.xcodeproj/project.pbxproj` passes.
-	- Timeout verification: `XCODEBUILD_TIMEOUT_SECONDS=5 HEARTBEAT_SECONDS=1 VALIDATION_MODE=dual-ipad ./scripts/ci-cd/validate-controller-ipad-build.sh` exits after the project-list preflight timeout and prints the last `xcodebuild` log lines.
+	- Status: migrated to SwiftPM.
+	- Notes: `GaiaControllerApp.xcodeproj` was removed; the script was rewritten to drive `swift build --triple` with the iphoneos SDK. iPadOS arm64 builds are validated via this script or `scripts/ci-cd/build-ipados-swiftpm.sh`.
 - Xcode project compile verification
-	- Status: passed in staging copy
-	- Notes: a direct `xcodebuild -project GaiaControllerApp.xcodeproj -scheme GaiaControllerApp -destination 'generic/platform=iOS Simulator' CODE_SIGN_IDENTITY='' CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build` from `/tmp` succeeded after adding direct GaiaCore source references to the Xcode target.
-	- Build settings: `ENABLE_DEBUG_DYLIB = NO` ensures Debug simulator bundles include `GaiaControllerApp.app/GaiaControllerApp` instead of only `__preview.dylib`; `ONLY_ACTIVE_ARCH = YES` keeps simulator validation focused and repeatable.
-	- Residual blocker: the same build from the FileProvider-backed workspace path can still hang after `Command line invocation`; the staging-copy validation path avoids that environment/path-state issue.
+	- Status: obsolete — `GaiaControllerApp.xcodeproj` has been removed.
+	- Notes: The project builds exclusively via SwiftPM (`swift build --product GaiaControllerApp`). Open the `Package.swift` in Xcode for IDE-based builds.
 - 11-inch and 13-inch explicit visual verification
-	- Status: passed
-	- iPad Pro 11-inch (M5): generic simulator build from staging copy passed, generated an executable app bundle, installed on simulator `BDF37171-A2DA-4298-AF49-B85102D79FCA`, and launched `com.laparo.GaiaControllerApp` with `LAUNCH_EXIT:0`.
-	- iPad Pro 13-inch (M5): same executable app bundle installed on simulator `915D6CB4-FD2F-4405-9FE5-BCA5EEF6BA93` and launched `com.laparo.GaiaControllerApp` with `LAUNCH_EXIT:0`.
-	- Evidence: iPad 13 screenshot captured at `/tmp/gaia-dashboard-screenshots/ipad-13-dashboard.png`; iPad 11 launch was confirmed before the later screenshot retry hit a CoreSimulator install hang.
+	- Status: passed (historical)
+	- Notes: Validated via staging-copy xcodebuild before .xcodeproj removal. Future visual verification should use SwiftPM-based builds.
 
 ### Performance Measurement Notes
 

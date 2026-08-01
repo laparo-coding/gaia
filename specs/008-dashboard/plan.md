@@ -91,11 +91,8 @@
 - Client: `ConnectionStatusMonitor.eventStream()` beendet bei sauberem Stream-Ende via `continuation.finish(throwing: nil)`, flusht trailing Buffer und gibt nach erschöpftem Reconnect-Budget den finalen Fehler an den Aufrufer zurück.
 - Live-SSE-Validierung: `curl --raw` zeigt chunked-encoded Wire-Bytes (`<hex>\r\n<bytes>\r\n`) gemäß RFC 7230 §4.1; Python-Decoder zerlegt die Chunks korrekt; Client-Cancel führt zu sauberem Server-Cleanup ohne Log-Spam.
 
-## Remaining Validation Blockers
+## Resolved Validation Notes
 
-- `./scripts/ci-cd/validate-controller-ipad-build.sh`: invocation starts but did not complete with a final result in this run context.
-- `./scripts/ci-cd/validate-controller-ipad-build.sh` with `VALIDATION_MODE=dual-ipad`: explicit 11-inch/13-inch targeting emits heartbeats, but `xcodebuild` stays at `Command line invocation` without further progress in this environment.
-- `xcodebuild -list -project GaiaControllerApp.xcodeproj`: also hangs after command invocation; `plutil -lint GaiaControllerApp.xcodeproj/project.pbxproj` passes, and `swift build --product GaiaControllerApp` passes.
-- The iPad validation script now fails fast through `XCODEBUILD_TIMEOUT_SECONDS` and logs the last `xcodebuild` output instead of hanging indefinitely.
-- A direct Xcode simulator build from a `/tmp` staging copy succeeds, confirming the project compiles with the added direct GaiaCore source references. The workspace path can still hang immediately after invocation, so iPad validation uses the staging-copy build path.
-- Final iPad validation passed after disabling Xcode's Debug dylib packaging (`ENABLE_DEBUG_DYLIB = NO`) so the simulator bundle contains `GaiaControllerApp.app/GaiaControllerApp`. The resulting bundle installed and launched successfully on iPad Pro 11-inch (M5) and iPad Pro 13-inch (M5) simulators.
+- `GaiaControllerApp.xcodeproj` was removed; the project builds exclusively via SwiftPM.
+- `./scripts/ci-cd/validate-controller-ipad-build.sh` was migrated to SwiftPM and drives `swift build --triple` with the iphoneos SDK.
+- Historical iPad validation passed on 11-inch and 13-inch simulators via a staging-copy xcodebuild approach before the .xcodeproj was removed.

@@ -9,19 +9,19 @@ This folder hosts the iPad controller shell for the controller-design feature.
 
 ## Reproducible build validation (iPad landscape)
 
-Use Xcode build tooling against an iPad simulator destination:
+Use SwiftPM with the CI build script (targets iPadOS arm64):
 
 ```bash
-xcodebuild \
-  -project GaiaControllerApp.xcodeproj \
-  -scheme GaiaControllerApp \
-  -destination 'generic/platform=iOS Simulator' \
-  build
+bash scripts/ci-cd/build-ipados-swiftpm.sh
 ```
 
-If your project uses a workspace, replace `-project` with `-workspace <name>.xcworkspace`.
+Or run a quick host compile check (does **not** validate iPadOS):
+
+```bash
+swift build --product GaiaControllerApp
+```
 
 Landscape validation expectation:
 
-- The build completes with `** BUILD SUCCEEDED **`.
+- The build completes successfully.
 - The target is configured for iPad landscape mode; confirm runtime launch behavior separately.
