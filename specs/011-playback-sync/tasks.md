@@ -27,7 +27,7 @@
 
 ### Implementation
 
-- [ ] T003 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandDelegate.swift` with `@MainActor protocol PlaybackCommandDelegate: AnyObject` defining `onPlay()`, `onStop()`, `onSeek(position: Double)`, `onChapterBoundary()` (depends on T001).
+- [ ] T003 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandDelegate.swift` with `@MainActor protocol PlaybackCommandDelegate: AnyObject` defining `onPlay()`, `onStop()`, `onSeek(position: Double)`, `onChapterBoundary()`, `onSyncOffline()` (depends on T001).
 - [ ] T004 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift` with `actor PlaybackCommandMonitor`: `init(baseURL:recordingId:authenticator:)`, `start(delegate:) async`, `stop() async`. Uses `URLSession.bytes(for:)` for SSE streaming, `HTTPChunkedTransfer` for line parsing, `AitherServiceAuthenticator` for Bearer header. Parses `event: command` + `data:` JSON. Dispatches to delegate via `Task { @MainActor in }` (depends on T002, T003).
 
 **Checkpoint**: Delegate protocol + monitor actor ready — user story implementation can begin.
@@ -68,9 +68,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Extend `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift`: implement reconnect with backoff `[0.5, 1, 2, 5]` seconds, max 10 attempts; on exhaustion, call `delegate.onSyncOffline()` (new method on delegate). Implement 401 handling via `ServiceAuthorizationCoordinator` (depends on T004, T020, T021).
-- [ ] T024 [US2] Extend `Sources/GaiaCore/Playback/PlaybackCommandDelegate.swift`: add `onSyncOffline()` method to protocol (depends on T023).
-- [ ] T025 [US2] Extend `app/controller/VideoPlayerViewModel.swift`: implement `onSyncOffline()` — set `syncOffline` published state; `VideoPlaybackCard` shows hint text when `syncOffline == true` (depends on T013, T022, T024).
+- [ ] T023 [US2] Extend `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift`: implement reconnect with backoff `[0.5, 1, 2, 5]` seconds, max 10 attempts; on exhaustion, call `delegate.onSyncOffline()`. Implement 401 handling via `ServiceAuthorizationCoordinator` (depends on T004, T020, T021).
+- [ ] T024 [US2] Extend `app/controller/VideoPlayerViewModel.swift`: implement `onSyncOffline()` — set `syncOffline` published state; `VideoPlaybackCard` shows hint text when `syncOffline == true` (depends on T013, T022, T023).
 
 **Checkpoint**: User Story 2 fully functional — Gaia reconnects and shows hint on exhaustion.
 
