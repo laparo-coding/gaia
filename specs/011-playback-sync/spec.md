@@ -10,6 +10,7 @@ Draft — ready for `/clarify`, `/plan`, `/tasks`.
 
 - Q: Was passiert, wenn der Operator bereits manuell auf eine Position nach dem ersten Kapitel gesucht hat und dann ein `play`-SSE-Kommando eintrifft? Soll Gaia trotzdem auf Kapitel 0 zurückspringen, oder ab der aktuellen Position abspielen? → A: **Immer auf Kapitel 0 springen (Option A).** Beim ersten `play`-Kommando (egal ob via SSE oder manuellem Button) sucht Gaia deterministisch auf `chapters[0].start`, unabhängig von der aktuellen Position. Das `hasPlayedOnce`-Flag verhindert wiederholtes Springen bei nachfolgenden `play`-Kommandos. Begründung: Sync-Konsistenz mit dem Aither-Web-Player (Aither Spec 011, FR-002 sucht ebenfalls immer auf `chapters[0].start` beim ersten Play). Wenn Gaia anders reagiert, sind beide Player nicht mehr synchron — das widerspricht dem Kernziel dieser Spec.
 - Q: Wie soll der `PlaybackCommandMonitor` mit einem abgelaufenen/ungültigen Bearer-Token umgehen (401 auf den SSE-Request)? → A: **Token erneuern + retry (Option B).** Der Monitor nutzt die bestehende `ServiceAuthorizationCoordinator`-Retry-Logik: bei HTTP 401 auf den initialen SSE-Verbindungsaufbau wird der Token-Cache invalidiert, der `AitherServiceAuthenticator` fordert einen neuen Token an (Provider liest `AITHER_SYNC_TOKEN` neu), und der SSE-Request wird einmalig wiederholt. Schlägt der Retry ebenfalls fehl (Token wirklich ungültig), stoppt der Monitor die Reconnect-Versuche. Begründung: Bestehende Infrastruktur (`ServiceAuthorizationCoordinator` hat bereits 401-Retry mit Cache-Invalidierung), kein Operator-Eingriff nötig, Sync bleibt nach kurzer Unterbrechung wiederhergestellt. Einschränkung: Die Retry-Logik greift nur beim initialen Verbindungsaufbau, nicht für Mid-Stream-Expiry — das ist akzeptabel, da SSE-Verbindungen beim nächsten Reconnect (nach Netzwerkfehler) den frischen Token nutzen.
+- Q: Was passiert, wenn nach 10 fehlgeschlagenen Reconnect-Versuchen Aither immer noch nicht erreichbar ist? → A: **Stoppen + UI-Hinweis (Option C).** Der Monitor stoppt die Reconnect-Versuche nach Erreichen des Caps (NFR-003) und der `VideoPlayerViewModel` zeigt einen Hinweis im Player an („Aither nicht erreichbar — Sync offline“). Der Player bleibt manuell bedienbar (Play-Button funktioniert). Der Operator muss die View neu laden, um die SSE-Sync erneut zu starten. Begründung: Operator-Feedback (im Gegensatz zu stillem Stop), keine endlosen Retries die Batterie/Netzwerk belasten, konsistent mit `ConnectionStatusMonitor` der ebenfalls begrenzte Retries hat.
 
 ## Overview
 
@@ -171,6 +172,10 @@ command.
   seek — consistent with Spec 010's `chaptersNotGenerated` fallback.
 - What happens if a `chapter-boundary` SSE event arrives? Gaia ignores it
   (Spec 010 handles boundaries via local time observer, not via SSE).
+- What happens after 10 failed reconnect attempts? The monitor stops and the
+  player shows „Aither nicht erreichbar — Sync offline“. The player remains
+  manually operable (Play button works). The operator must reload the view to
+  restart SSE sync.
 
 ## Requirements *(mandatory)*
 
@@ -206,8 +211,11 @@ command.
 - **NFR-001**: The SSE subscription MUST NOT block the main actor — the
   monitor runs on a background task; UI updates are dispatched to `@MainActor`.
 - **NFR-002**: The monitor MUST be `Sendable`-safe (Swift 6 concurrency).
-- **NFR-003**: Reconnect attempts MUST be capped (e.g., max 10 retries) to
-  avoid infinite loops if Aither is permanently down.
+- **NFR-003**: Reconnect attempts MUST be capped (max 10 retries with backoff
+  0.5, 1, 2, 5 seconds). After exhausting retries, the monitor MUST stop and
+  the `VideoPlayerViewModel` MUST show a UI hint („Aither nicht erreichbar —
+  Sync offline“). The player remains manually operable. The operator must
+  reload the view to restart SSE sync.
 - **NFR-004**: All new code MUST be covered by unit tests (Swift Testing /
   XCTest per existing `GaiaCoreTests` convention).
 
