@@ -22,13 +22,13 @@
 
 ### Tests (write first, must fail)
 
-- [ ] T001 [P] [SHARED] Unit test for `PlaybackCommandDelegate` protocol conformance in `Tests/GaiaCoreTests/Playback/PlaybackCommandDelegateTests.swift`: verify a minimal `@MainActor` mock conforming to the protocol receives `onPlay`, `onStop`, `onSeek(position:)`, `onChapterBoundary` callbacks.
-- [ ] T002 [P] [SHARED] Unit test for `PlaybackCommandMonitor` SSE parsing in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: parse `play`, `stop`, `seek`, `chapter-boundary` events from mock SSE stream; verify delegate callbacks dispatched via `Task { @MainActor in }`.
+- [X] T001 [P] [SHARED] Unit test for `PlaybackCommandDelegate` protocol conformance in `Tests/GaiaCoreTests/Playback/PlaybackCommandDelegateTests.swift`: verify a minimal `@MainActor` mock conforming to the protocol receives `onPlay`, `onStop`, `onSeek(position:)`, `onChapterBoundary` callbacks.
+- [X] T002 [P] [SHARED] Unit test for `PlaybackCommandMonitor` SSE parsing in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: parse `play`, `stop`, `seek`, `chapter-boundary` events from mock SSE stream; verify delegate callbacks dispatched via `Task { @MainActor in }`.
 
 ### Implementation
 
-- [ ] T003 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandDelegate.swift` with `@MainActor protocol PlaybackCommandDelegate: AnyObject` defining `onPlay()`, `onStop()`, `onSeek(position: Double)`, `onChapterBoundary()`, `onSyncOffline()` (depends on T001).
-- [ ] T004 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift` with `actor PlaybackCommandMonitor`: `init(baseURL:recordingId:authenticator:)`, `start(delegate:) async`, `stop() async`. Uses `URLSession.bytes(for:)` for SSE streaming, `HTTPChunkedTransfer` for line parsing, `AitherServiceAuthenticator` for Bearer header. Parses `event: command` + `data:` JSON. Dispatches to delegate via `Task { @MainActor in }` (depends on T002, T003).
+- [X] T003 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandDelegate.swift` with `@MainActor protocol PlaybackCommandDelegate: AnyObject` defining `onPlay()`, `onStop()`, `onSeek(position: Double)`, `onChapterBoundary()`, `onSyncOffline()` (depends on T001).
+- [X] T004 [SHARED] Create `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift` with `actor PlaybackCommandMonitor`: `init(baseURL:recordingId:authenticator:)`, `start(delegate:) async`, `stop() async`. Uses `URLSession.bytes(for:)` for SSE streaming, `HTTPChunkedTransfer` for line parsing, `AitherServiceAuthenticator` for Bearer header. Parses `event: command` + `data:` JSON. Dispatches to delegate via `Task { @MainActor in }` (depends on T002, T003).
 
 **Checkpoint**: Delegate protocol + monitor actor ready — user story implementation can begin.
 
