@@ -11,6 +11,7 @@ Draft — ready for `/clarify`, `/plan`, `/tasks`.
 - Q: Was passiert, wenn der Operator bereits manuell auf eine Position nach dem ersten Kapitel gesucht hat und dann ein `play`-SSE-Kommando eintrifft? Soll Gaia trotzdem auf Kapitel 0 zurückspringen, oder ab der aktuellen Position abspielen? → A: **Immer auf Kapitel 0 springen (Option A).** Beim ersten `play`-Kommando (egal ob via SSE oder manuellem Button) sucht Gaia deterministisch auf `chapters[0].start`, unabhängig von der aktuellen Position. Das `hasPlayedOnce`-Flag verhindert wiederholtes Springen bei nachfolgenden `play`-Kommandos. Begründung: Sync-Konsistenz mit dem Aither-Web-Player (Aither Spec 011, FR-002 sucht ebenfalls immer auf `chapters[0].start` beim ersten Play). Wenn Gaia anders reagiert, sind beide Player nicht mehr synchron — das widerspricht dem Kernziel dieser Spec.
 - Q: Wie soll der `PlaybackCommandMonitor` mit einem abgelaufenen/ungültigen Bearer-Token umgehen (401 auf den SSE-Request)? → A: **Token erneuern + retry (Option B).** Der Monitor nutzt die bestehende `ServiceAuthorizationCoordinator`-Retry-Logik: bei HTTP 401 auf den initialen SSE-Verbindungsaufbau wird der Token-Cache invalidiert, der `AitherServiceAuthenticator` fordert einen neuen Token an (Provider liest `AITHER_SYNC_TOKEN` neu), und der SSE-Request wird einmalig wiederholt. Schlägt der Retry ebenfalls fehl (Token wirklich ungültig), stoppt der Monitor die Reconnect-Versuche. Begründung: Bestehende Infrastruktur (`ServiceAuthorizationCoordinator` hat bereits 401-Retry mit Cache-Invalidierung), kein Operator-Eingriff nötig, Sync bleibt nach kurzer Unterbrechung wiederhergestellt. Einschränkung: Die Retry-Logik greift nur beim initialen Verbindungsaufbau, nicht für Mid-Stream-Expiry — das ist akzeptabel, da SSE-Verbindungen beim nächsten Reconnect (nach Netzwerkfehler) den frischen Token nutzen.
 - Q: Was passiert, wenn nach 10 fehlgeschlagenen Reconnect-Versuchen Aither immer noch nicht erreichbar ist? → A: **Stoppen + UI-Hinweis (Option C).** Der Monitor stoppt die Reconnect-Versuche nach Erreichen des Caps (NFR-003) und der `VideoPlayerViewModel` zeigt einen Hinweis im Player an („Aither nicht erreichbar — Sync offline“). Der Player bleibt manuell bedienbar (Play-Button funktioniert). Der Operator muss die View neu laden, um die SSE-Sync erneut zu starten. Begründung: Operator-Feedback (im Gegensatz zu stillem Stop), keine endlosen Retries die Batterie/Netzwerk belasten, konsistent mit `ConnectionStatusMonitor` der ebenfalls begrenzte Retries hat.
+- Q: Wie soll der Monitor den Delegate-Callback thread-safe ausführen, wenn SSE-Events auf einem Background-Task ankommen? → A: **`Task { @MainActor in }` pro Event (Option A).** Jedes SSE-Event wrappt den Delegate-Aufruf in `Task { @MainActor in delegate.onPlay() }`. Der Monitor läuft auf einem Background-Task (SSE-Streaming via `URLSession.bytes`); nur der Delegate-Aufruf hoppt auf Main-Actor. Begründung: Swift 6 safe (kanonischer Actor-Hop), NFR-001 erfüllt (Background-Task wird nicht blockiert), bestehendes `@MainActor protocol`-Pattern beibehalten (dasselbe Muster wie `ConnectionStatusMonitor`), Performance irrelevant (SSE-Events sind selten, < 1/s).
 
 ## Overview
 
@@ -209,7 +210,9 @@ command.
 ### Non-Functional Requirements
 
 - **NFR-001**: The SSE subscription MUST NOT block the main actor — the
-  monitor runs on a background task; UI updates are dispatched to `@MainActor`.
+  monitor runs on a background task (`URLSession.bytes`); UI updates are
+  dispatched to `@MainActor` via `Task { @MainActor in delegate.onPlay() }`
+  per event (same pattern as `ConnectionStatusMonitor`).
 - **NFR-002**: The monitor MUST be `Sendable`-safe (Swift 6 concurrency).
 - **NFR-003**: Reconnect attempts MUST be capped (max 10 retries with backoff
   0.5, 1, 2, 5 seconds). After exhausting retries, the monitor MUST stop and
@@ -253,6 +256,11 @@ actor PlaybackCommandMonitor {
   func stop() async
 }
 ```
+
+**Thread-Safety**: The monitor runs on a background task. Each SSE event
+wraps the delegate callback in `Task { @MainActor in ... }` to hop to the
+main actor (same pattern as `ConnectionStatusMonitor`). The delegate protocol
+remains synchronous (`@MainActor`-isolated); no `async` methods needed.
 
 ## Testing Strategy
 
