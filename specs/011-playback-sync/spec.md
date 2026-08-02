@@ -4,6 +4,12 @@
 
 Draft — ready for `/clarify`, `/plan`, `/tasks`.
 
+## Clarifications
+
+### Session 2026-08-02
+
+- Q: Was passiert, wenn der Operator bereits manuell auf eine Position nach dem ersten Kapitel gesucht hat und dann ein `play`-SSE-Kommando eintrifft? Soll Gaia trotzdem auf Kapitel 0 zurückspringen, oder ab der aktuellen Position abspielen? → A: **Immer auf Kapitel 0 springen (Option A).** Beim ersten `play`-Kommando (egal ob via SSE oder manuellem Button) sucht Gaia deterministisch auf `chapters[0].start`, unabhängig von der aktuellen Position. Das `hasPlayedOnce`-Flag verhindert wiederholtes Springen bei nachfolgenden `play`-Kommandos. Begründung: Sync-Konsistenz mit dem Aither-Web-Player (Aither Spec 011, FR-002 sucht ebenfalls immer auf `chapters[0].start` beim ersten Play). Wenn Gaia anders reagiert, sind beide Player nicht mehr synchron — das widerspricht dem Kernziel dieser Spec.
+
 ## Overview
 
 Gaia subscribes to Aither's **SSE playback command channel**
@@ -175,9 +181,13 @@ command.
 - **FR-003**: Gaia MUST handle `play`, `stop`, and `seek` SSE commands by
   forwarding them to `VideoPlayerViewModel` (call `play()`, `pause()`, or
   `seek(to:)`).
-- **FR-004**: On the first `play` SSE command, Gaia MUST seek to
-  `chapters[0].start` (if chapters are loaded) before playing — matching
-  Aither web player behavior (Aither Spec 011, FR-002) and Gaia Spec 010.
+- **FR-004**: On the first `play` command (whether via SSE or manual button),
+  Gaia MUST seek to `chapters[0].start` (if chapters are loaded) before playing
+  — matching Aither web player behavior (Aither Spec 011, FR-002) and Gaia
+  Spec 010. This seek is **deterministic and position-independent**: it occurs
+  regardless of the current playback position (even if the operator manually
+  seeked ahead). The `hasPlayedOnce` flag prevents re-seeking on subsequent
+  `play` commands (after pause/resume).
 - **FR-005**: Gaia MUST ignore `chapter-boundary` SSE events (Spec 010 handles
   boundaries locally via `AVPlayer` time observer).
 - **FR-006**: On SSE disconnect/error, the monitor MUST retry with backoff
