@@ -42,13 +42,13 @@
 
 ### Tests for User Story 1 (write first, must fail)
 
-- [ ] T010 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `VideoPlayerViewModel` conforms to `PlaybackCommandDelegate`; `onPlay()` triggers initial seek to `chapters[0].start` on first call (if chapters loaded), then `player.play()`; `hasPlayedOnce` prevents re-seek on subsequent calls.
-- [ ] T011 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `onStop()` calls `player.pause()`; `onSeek(position:)` calls `player.seek(to:)`; `onChapterBoundary()` calls `player.pause()`.
-- [ ] T012 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `preparePlayer()` starts `PlaybackCommandMonitor`; deinit stops it.
+- [X] T010 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `VideoPlayerViewModel` conforms to `PlaybackCommandDelegate`; `onPlay()` triggers initial seek to `chapters[0].start` on first call (if chapters loaded), then `player.play()`; `hasPlayedOnce` prevents re-seek on subsequent calls.
+- [X] T011 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `onStop()` calls `player.pause()`; `onSeek(position:)` calls `player.seek(to:)`; `onChapterBoundary()` calls `player.pause()`.
+- [X] T012 [P] [US1] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: `preparePlayer()` starts `PlaybackCommandMonitor`; deinit stops it.
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] Extend `app/controller/VideoPlayerViewModel.swift`: conform to `PlaybackCommandDelegate`; add `onPlay()` (initial seek to `chapters[0].start` if `!hasPlayedOnce && chapters.count > 0`, set `hasPlayedOnce = true`, call `play()`), `onStop()` (call `pause()`), `onSeek(position:)` (seek `AVPlayer`), `onChapterBoundary()` (call `pause()`). Start `PlaybackCommandMonitor` in `preparePlayer()` after player is ready; stop in `pause()`/deinit (depends on T004, T010, T011, T012).
+- [X] T013 [US1] Extend `app/controller/VideoPlayerViewModel.swift`: conform to `PlaybackCommandDelegate`; add `onPlay()` (initial seek to `chapters[0].start` if `!hasPlayedOnce && chapters.count > 0`, set `hasPlayedOnce = true`, call `play()`), `onStop()` (call `pause()`), `onSeek(position:)` (seek `AVPlayer`), `onChapterBoundary()` (call `pause()`). Start `PlaybackCommandMonitor` in `preparePlayer()` after player is ready; stop in `pause()`/deinit (depends on T004, T010, T011, T012).
 
 **Checkpoint**: User Story 1 fully functional — Gaia plays in sync with Aither web player.
 
