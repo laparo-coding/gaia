@@ -9,6 +9,7 @@ Draft — ready for `/clarify`, `/plan`, `/tasks`.
 ### Session 2026-08-02
 
 - Q: Was passiert, wenn der Operator bereits manuell auf eine Position nach dem ersten Kapitel gesucht hat und dann ein `play`-SSE-Kommando eintrifft? Soll Gaia trotzdem auf Kapitel 0 zurückspringen, oder ab der aktuellen Position abspielen? → A: **Immer auf Kapitel 0 springen (Option A).** Beim ersten `play`-Kommando (egal ob via SSE oder manuellem Button) sucht Gaia deterministisch auf `chapters[0].start`, unabhängig von der aktuellen Position. Das `hasPlayedOnce`-Flag verhindert wiederholtes Springen bei nachfolgenden `play`-Kommandos. Begründung: Sync-Konsistenz mit dem Aither-Web-Player (Aither Spec 011, FR-002 sucht ebenfalls immer auf `chapters[0].start` beim ersten Play). Wenn Gaia anders reagiert, sind beide Player nicht mehr synchron — das widerspricht dem Kernziel dieser Spec.
+- Q: Wie soll der `PlaybackCommandMonitor` mit einem abgelaufenen/ungültigen Bearer-Token umgehen (401 auf den SSE-Request)? → A: **Token erneuern + retry (Option B).** Der Monitor nutzt die bestehende `ServiceAuthorizationCoordinator`-Retry-Logik: bei HTTP 401 auf den initialen SSE-Verbindungsaufbau wird der Token-Cache invalidiert, der `AitherServiceAuthenticator` fordert einen neuen Token an (Provider liest `AITHER_SYNC_TOKEN` neu), und der SSE-Request wird einmalig wiederholt. Schlägt der Retry ebenfalls fehl (Token wirklich ungültig), stoppt der Monitor die Reconnect-Versuche. Begründung: Bestehende Infrastruktur (`ServiceAuthorizationCoordinator` hat bereits 401-Retry mit Cache-Invalidierung), kein Operator-Eingriff nötig, Sync bleibt nach kurzer Unterbrechung wiederhergestellt. Einschränkung: Die Retry-Logik greift nur beim initialen Verbindungsaufbau, nicht für Mid-Stream-Expiry — das ist akzeptabel, da SSE-Verbindungen beim nächsten Reconnect (nach Netzwerkfehler) den frischen Token nutzen.
 
 ## Overview
 
@@ -161,8 +162,10 @@ command.
   called again (e.g., recording change)? The monitor cancels the existing task
   and opens a new one for the new `assetId`.
 - What happens if the Bearer token is expired? The SSE request returns 401;
-  the monitor logs the error and stops retrying (no silent fallback — the
-  operator must re-authenticate).
+  the monitor uses the existing `ServiceAuthorizationCoordinator` retry logic:
+  cache invalidation → token renewal via `AitherServiceAuthenticator` → single
+  retry. If the retry also fails (token truly invalid), the monitor stops
+  retrying. No silent fallback — the operator must re-authenticate.
 - What happens if `chapters` are not loaded yet when the first `play` command
   arrives? The view model plays from the current position (0) without initial
   seek — consistent with Spec 010's `chaptersNotGenerated` fallback.
