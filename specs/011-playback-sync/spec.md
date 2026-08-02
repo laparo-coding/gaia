@@ -2,7 +2,7 @@
 
 ## Status
 
-Draft — ready for `/clarify`, `/plan`, `/tasks`.
+Implemented — all phases complete; 24 tests passing.
 
 ## Clarifications
 

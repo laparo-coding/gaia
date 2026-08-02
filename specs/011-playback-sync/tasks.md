@@ -62,14 +62,14 @@
 
 ### Tests for User Story 2 (write first, must fail)
 
-- [ ] T020 [P] [US2] Unit test in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: reconnect backoff sequence (0.5, 1, 2, 5, 5, ... seconds); max 10 attempts; after 10, stops and notifies delegate of sync-offline.
-- [ ] T021 [P] [US2] Unit test in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: 401 handling — `ServiceAuthorizationCoordinator` retry (cache invalidation → token renewal → single retry); if retry fails, stop.
-- [ ] T022 [P] [US2] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: sync-offline state shows UI hint "Aither nicht erreichbar — Sync offline"; player remains manually operable.
+- [X] T020 [P] [US2] Unit test in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: reconnect backoff sequence (0.5, 1, 2, 5, 5, ... seconds); max 10 attempts; after 10, stops and notifies delegate of sync-offline.
+- [X] T021 [P] [US2] Unit test in `Tests/GaiaCoreTests/Playback/PlaybackCommandMonitorTests.swift`: 401 handling — `ServiceAuthorizationCoordinator` retry (cache invalidation → token renewal → single retry); if retry fails, stop.
+- [X] T022 [P] [US2] Integration test in `Tests/GaiaCoreTests/Playback/VideoPlayerViewModelPlaybackSyncTests.swift`: sync-offline state shows UI hint "Aither nicht erreichbar — Sync offline"; player remains manually operable.
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Extend `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift`: implement reconnect with backoff `[0.5, 1, 2, 5]` seconds, max 10 attempts; on exhaustion, call `delegate.onSyncOffline()`. Implement 401 handling via `ServiceAuthorizationCoordinator` (depends on T004, T020, T021).
-- [ ] T024 [US2] Extend `app/controller/VideoPlayerViewModel.swift`: implement `onSyncOffline()` — set `syncOffline` published state; `VideoPlaybackCard` shows hint text when `syncOffline == true` (depends on T013, T022, T023).
+- [X] T023 [US2] Extend `Sources/GaiaCore/Playback/PlaybackCommandMonitor.swift`: implement reconnect with backoff `[0.5, 1, 2, 5]` seconds, max 10 attempts; on exhaustion, call `delegate.onSyncOffline()`. Implement 401 handling via `ServiceAuthorizationCoordinator` (depends on T004, T020, T021).
+- [X] T024 [US2] Extend `app/controller/VideoPlayerViewModel.swift`: implement `onSyncOffline()` — set `syncOffline` published state; `VideoPlaybackCard` shows hint text when `syncOffline == true` (depends on T013, T022, T023).
 
 **Checkpoint**: User Story 2 fully functional — Gaia reconnects and shows hint on exhaustion.
 
@@ -86,6 +86,6 @@
 
 ### Documentation
 
-- [ ] T040 [P] [DOCS] Update `specs/011-playback-sync/spec.md` Status field from "Draft" to "Implemented" after all tasks complete.
+- [X] T040 [P] [DOCS] Update `specs/011-playback-sync/spec.md` Status field from "Draft" to "Implemented" after all tasks complete.
 
 **Checkpoint**: Feature complete — all user stories validated end-to-end.
