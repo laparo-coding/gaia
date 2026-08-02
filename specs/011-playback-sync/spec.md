@@ -12,6 +12,7 @@ Draft — ready for `/clarify`, `/plan`, `/tasks`.
 - Q: Wie soll der `PlaybackCommandMonitor` mit einem abgelaufenen/ungültigen Bearer-Token umgehen (401 auf den SSE-Request)? → A: **Token erneuern + retry (Option B).** Der Monitor nutzt die bestehende `ServiceAuthorizationCoordinator`-Retry-Logik: bei HTTP 401 auf den initialen SSE-Verbindungsaufbau wird der Token-Cache invalidiert, der `AitherServiceAuthenticator` fordert einen neuen Token an (Provider liest `AITHER_SYNC_TOKEN` neu), und der SSE-Request wird einmalig wiederholt. Schlägt der Retry ebenfalls fehl (Token wirklich ungültig), stoppt der Monitor die Reconnect-Versuche. Begründung: Bestehende Infrastruktur (`ServiceAuthorizationCoordinator` hat bereits 401-Retry mit Cache-Invalidierung), kein Operator-Eingriff nötig, Sync bleibt nach kurzer Unterbrechung wiederhergestellt. Einschränkung: Die Retry-Logik greift nur beim initialen Verbindungsaufbau, nicht für Mid-Stream-Expiry — das ist akzeptabel, da SSE-Verbindungen beim nächsten Reconnect (nach Netzwerkfehler) den frischen Token nutzen.
 - Q: Was passiert, wenn nach 10 fehlgeschlagenen Reconnect-Versuchen Aither immer noch nicht erreichbar ist? → A: **Stoppen + UI-Hinweis (Option C).** Der Monitor stoppt die Reconnect-Versuche nach Erreichen des Caps (NFR-003) und der `VideoPlayerViewModel` zeigt einen Hinweis im Player an („Aither nicht erreichbar — Sync offline“). Der Player bleibt manuell bedienbar (Play-Button funktioniert). Der Operator muss die View neu laden, um die SSE-Sync erneut zu starten. Begründung: Operator-Feedback (im Gegensatz zu stillem Stop), keine endlosen Retries die Batterie/Netzwerk belasten, konsistent mit `ConnectionStatusMonitor` der ebenfalls begrenzte Retries hat.
 - Q: Wie soll der Monitor den Delegate-Callback thread-safe ausführen, wenn SSE-Events auf einem Background-Task ankommen? → A: **`Task { @MainActor in }` pro Event (Option A).** Jedes SSE-Event wrappt den Delegate-Aufruf in `Task { @MainActor in delegate.onPlay() }`. Der Monitor läuft auf einem Background-Task (SSE-Streaming via `URLSession.bytes`); nur der Delegate-Aufruf hoppt auf Main-Actor. Begründung: Swift 6 safe (kanonischer Actor-Hop), NFR-001 erfüllt (Background-Task wird nicht blockiert), bestehendes `@MainActor protocol`-Pattern beibehalten (dasselbe Muster wie `ConnectionStatusMonitor`), Performance irrelevant (SSE-Events sind selten, < 1/s).
+- Q: Soll Gaia `chapter-boundary` SSE-Events ignorieren (FR-005 wie spezifiziert) oder ebenfalls pausieren, um mit dem Aither-Web-Player synchron zu bleiben (Spec 010 FR-015 pausiert am Kapitelende)? → A: **Pausieren bei `chapter-boundary`-Event (Option B).** Gaia reagiert auf `chapter-boundary` SSE-Events und pausiert ebenfalls (`player.pause()`). Beide Player bleiben synchron (beide pausieren am Kapitelende). Begründung: Das Kernziel dieser Spec ist Sync — wenn der Aither-Web-Player pausiert und Gaia weiterläuft, sind sie nicht mehr synchron. Das `chapter-boundary`-Event ist ein gemeinsamer Befehl („pausiere jetzt"), keine Positionssynchronisation — das ist im Scope („synchronizes start/stop/seek commands"). FR-005 wird entsprechend angepasst.
 
 ## Overview
 
@@ -171,8 +172,10 @@ command.
 - What happens if `chapters` are not loaded yet when the first `play` command
   arrives? The view model plays from the current position (0) without initial
   seek — consistent with Spec 010's `chaptersNotGenerated` fallback.
-- What happens if a `chapter-boundary` SSE event arrives? Gaia ignores it
-  (Spec 010 handles boundaries via local time observer, not via SSE).
+- What happens if a `chapter-boundary` SSE event arrives? Gaia pauses playback
+  (`player.pause()`) to stay in sync with the Aither web player (Spec 010
+  FR-015). The local `AVPlayer` time observer (Spec 010) remains for local
+  boundary detection; the SSE event is an additional sync trigger.
 - What happens after 10 failed reconnect attempts? The monitor stops and the
   player shows „Aither nicht erreichbar — Sync offline“. The player remains
   manually operable (Play button works). The operator must reload the view to
@@ -197,8 +200,11 @@ command.
   regardless of the current playback position (even if the operator manually
   seeked ahead). The `hasPlayedOnce` flag prevents re-seeking on subsequent
   `play` commands (after pause/resume).
-- **FR-005**: Gaia MUST ignore `chapter-boundary` SSE events (Spec 010 handles
-  boundaries locally via `AVPlayer` time observer).
+- **FR-005**: Gaia MUST handle `chapter-boundary` SSE events by pausing
+  playback (`player.pause()`), keeping both players in sync at chapter end
+  (matching Aither web player Spec 010 FR-015). The local `AVPlayer` time
+  observer (Spec 010) remains for local boundary detection; the SSE event is
+  an additional sync trigger, not a replacement.
 - **FR-006**: On SSE disconnect/error, the monitor MUST retry with backoff
   (0.5, 1, 2, 5 seconds — same pattern as `ConnectionStatusMonitor`).
 - **FR-007**: When `VideoPlayerViewModel` is deinitialized or the player is
@@ -248,6 +254,7 @@ protocol PlaybackCommandDelegate: AnyObject {
   func onPlay()
   func onStop()
   func onSeek(position: Double)
+  func onChapterBoundary()
 }
 
 actor PlaybackCommandMonitor {
