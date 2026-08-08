@@ -441,6 +441,12 @@ let environment = LocalEnvironment.mergedWithProcessEnvironment(
   currentDirectoryPath: fileManager.currentDirectoryPath,
   processEnvironment: ProcessInfo.processInfo.environment
 )
+if let openRouterDiagnostic = LocalEnvironment.openRouterDiagnosticMessage(
+  appName: "GaiaCLI",
+  environment: environment
+) {
+  FileHandle.standardError.write(Data("\(openRouterDiagnostic)\n".utf8))
+}
 let _ = RollbarBootstrap.initialize(
   environment: environment,
   appName: "GaiaCLI"

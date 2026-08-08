@@ -96,12 +96,24 @@ This feature builds on the existing playback and service-connection work:
   so the newly encoded chapter metadata is reflected in the player. The
   "Next Chapter" button MUST use the refreshed chapter list for subsequent
   jumps.
-- **FR-008**: When `GET /api/recording/stream/[id]` returns a non-2xx status
+- **FR-008**: When `GET /api/recording/stream/[id]` returns a non-success status
   or times out, the player MUST display a distinct "stream unavailable" state
-  (not the generic `failed` state). The UI MUST offer a single-tap retry button
-  that re-requests the stream URL without requiring the operator to navigate
-  away. After 3 consecutive failures, the retry button MUST be disabled and
-  the error message MUST include guidance to check the recording status.
+  (not the generic `failed` state). Stream resolution accepts exactly two
+  successful outcome classes:
+  1. **Direct 2xx response** — a final `200`–`299` status from the server
+     (or `URLSession` following internal redirects) is treated as a valid
+     resolved stream URL; the client uses the final response URL for playback.
+  2. **HTTP 302 redirect** — an explicit `302 Found` response with a `Location`
+     header is treated as successful; the client extracts the redirect target
+     URL for playback. This is the *only* permitted redirect hop; all other
+     `3xx` statuses (`301`, `303`, `307`, `308`, etc.) MUST be classified as
+     stream failures and produce the stream-unavailable path. Any non-`2xx`,
+     non-`302` status (including `4xx`/`5xx` errors and timeouts) is likewise
+     a stream failure. The UI
+  MUST offer a single-tap retry button that re-requests the stream URL without
+  requiring the operator to navigate away. After 3 consecutive failures, the
+  retry button MUST be disabled and the error message MUST include guidance to
+  check the recording status.
   The disabled-retry state MUST be reset when the operator navigates away
   from the video playback surface and back (dismissal + re-entry), or when
   a dashboard refresh (`loadDashboard`) completes, clearing the consecutive
@@ -145,10 +157,11 @@ Gaia Controller so that I can present the recorded content with chapter
 navigation.
 
 **Acceptance Scenarios**:
-1. **Given** a chaptered asset exists for `assetId`, **When** the operator
+1. **Given** a chaptered asset exists for `assetId` with at least two chapters
+   whose `start` values span the playback timeline, **When** the operator
    opens the player, **Then** the chapter list loads from
    `GET /api/recording/chapters/[id]` and the "Next Chapter" button is
-   enabled.
+   enabled (because a chapter with `start > currentPosition` exists).
 2. **Given** the player is playing mid-chapter, **When** the operator presses
    "Next Chapter", **Then** the player seeks to the next chapter's `start`
    (client-side, ≤ 200 ms).

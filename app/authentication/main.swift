@@ -7,6 +7,12 @@ private let environment = LocalEnvironment.mergedWithProcessEnvironment(
   currentDirectoryPath: FileManager.default.currentDirectoryPath,
   processEnvironment: ProcessInfo.processInfo.environment
 )
+if let openRouterDiagnostic = LocalEnvironment.openRouterDiagnosticMessage(
+  appName: "GaiaAuthenticationApp",
+  environment: environment
+) {
+  FileHandle.standardError.write(Data("\(openRouterDiagnostic)\n".utf8))
+}
 private let _ = RollbarBootstrap.initialize(
   environment: environment,
   appName: "GaiaAuthenticationApp"

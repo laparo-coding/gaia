@@ -65,7 +65,7 @@ Sources/
 │       └── AitherServiceAuthenticator.swift # EXISTING: reused for Bearer auth
 ├── GaiaControllerApp/
 │   └── app/controller/
-│       └── VideoPlayerViewModel.swift     # EXTENDED: start/stop monitor, delegate conformance
+│       └── VideoPlayerViewModel.swift     # EXTENDED: start/stop monitor, delegate conformance, deinit cleanup
 └── ...
 
 Tests/

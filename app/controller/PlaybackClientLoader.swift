@@ -61,10 +61,7 @@ internal final class PlaybackClientLoader: ObservableObject {
 
     // Auth: require explicit HTTPS URL in production; allow loopback HTTP in development.
     let authBaseURL: URL
-    let authRaw = environment[LocalEnvironment.authBaseURLKey]?
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    if let raw = authRaw, !raw.isEmpty,
-      let url = URL(string: raw),
+    if let url = LocalEnvironment.authBaseURL(in: environment),
       let scheme = url.scheme?.lowercased(),
       let host = url.host,
       (scheme == "https"
@@ -73,7 +70,7 @@ internal final class PlaybackClientLoader: ObservableObject {
           && Self.isLoopbackHost(host)))
     {
       authBaseURL = url
-    } else if authRaw == nil || authRaw?.isEmpty == true,
+    } else if LocalEnvironment.authBaseURL(in: environment) == nil,
       (envRuntime == .development || envRuntime == .test),
       let fallback = URL(string: "http://127.0.0.1:8080")
     {

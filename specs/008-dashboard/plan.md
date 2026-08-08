@@ -94,5 +94,6 @@
 ## Resolved Validation Notes
 
 - `GaiaControllerApp.xcodeproj` was removed; the project builds exclusively via SwiftPM.
-- `./scripts/ci-cd/validate-controller-ipad-build.sh` was migrated to SwiftPM and drives `swift build --triple` with the iphoneos SDK.
-- Historical iPad validation passed on 11-inch and 13-inch simulators via a staging-copy xcodebuild approach before the .xcodeproj was removed.
+- `./scripts/ci-cd/validate-controller-ipad-build.sh` was rewritten to drive `swift build --triple` with the iphoneos SDK; status: passed.
+- `./scripts/ci-cd/build-ipados-swiftpm.sh` provides the canonical CI iPadOS arm64 build path.
+- Historical iPad validation passed on 11-inch and 13-inch simulators via a staging-copy xcodebuild approach before the .xcodeproj was removed. Runtime landscape validation on physical devices remains open for future E2E passes.

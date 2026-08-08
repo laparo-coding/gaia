@@ -391,7 +391,6 @@ update_existing_agent_file() {
     local in_tech_section=false
     local in_changes_section=false
     local tech_entries_added=false
-    local changes_entries_added=false
     local existing_changes_count=0
     
     while IFS= read -r line || [[ -n "$line" ]]; do
@@ -427,7 +426,6 @@ update_existing_agent_file() {
                 echo "$new_change_entry" >> "$temp_file"
             fi
             in_changes_section=true
-            changes_entries_added=true
             continue
         elif [[ $in_changes_section == true ]] && [[ "$line" =~ ^##[[:space:]] ]]; then
             echo "$line" >> "$temp_file"
@@ -444,7 +442,7 @@ update_existing_agent_file() {
         
         # Update timestamp
         if [[ "$line" =~ \*\*Last\ updated\*\*:.*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] ]]; then
-            echo "$line" | sed "s/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/$current_date/" >> "$temp_file"
+            echo "${line//[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/$current_date}" >> "$temp_file"
         else
             echo "$line" >> "$temp_file"
         fi

@@ -65,8 +65,8 @@ This report tracks planning and implementation validation artifacts for feature 
 ### iPad Landscape Validation Notes (11-inch / 13-inch)
 
 - `./scripts/ci-cd/validate-controller-ipad-build.sh`
-	- Status: migrated to SwiftPM.
-	- Notes: `GaiaControllerApp.xcodeproj` was removed; the script was rewritten to drive `swift build --triple` with the iphoneos SDK. iPadOS arm64 builds are validated via this script or `scripts/ci-cd/build-ipados-swiftpm.sh`.
+	- Status: passed
+	- Notes: Rewritten to drive `swift build --triple` with the iphoneos SDK. iPadOS arm64 builds are validated via this script or `scripts/ci-cd/build-ipados-swiftpm.sh`.
 - Xcode project compile verification
 	- Status: obsolete — `GaiaControllerApp.xcodeproj` has been removed.
 	- Notes: The project builds exclusively via SwiftPM (`swift build --product GaiaControllerApp`). Open the `Package.swift` in Xcode for IDE-based builds.

@@ -6,7 +6,7 @@ import Foundation
 /// `Task { @MainActor in ... }` per SSE event (Spec 011, NFR-001).
 /// The conformer is typically `VideoPlayerViewModel`.
 @MainActor
-public protocol PlaybackCommandDelegate: AnyObject {
+public protocol PlaybackCommandDelegate: AnyObject, Sendable {
   /// Called when a `play` SSE command is received.
   func onPlay()
 

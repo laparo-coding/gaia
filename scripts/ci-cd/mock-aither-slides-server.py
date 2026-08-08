@@ -42,7 +42,8 @@ state_lock = threading.Lock()
 
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, format_, *args):
+    def log_message(self, format, *args):  # noqa: A002
+        # pylint: disable=redefined-builtin
         return
 
     def _send_json(self, payload: dict, status: int = 200):

@@ -116,7 +116,8 @@ final class VideoPlayerViewModel: ObservableObject, PlaybackCommandDelegate {
   /// `AVPlayer`. Must be called on the main actor.
   func preparePlayer(requestID: String) async {
     let result = await playbackClient.resolvePlaybackURL(
-      assetId: assetId, requestID: requestID)
+      assetId: assetId, requestID: requestID,
+      transport: PlaybackClient.redirectSafeTransport)
 
     guard let url = result.value else {
       state = .failed(result.playbackError ?? .invalidResponse)
@@ -192,6 +193,15 @@ final class VideoPlayerViewModel: ObservableObject, PlaybackCommandDelegate {
   }
 
   // MARK: - SSE Monitor Lifecycle
+
+  deinit {
+    // Best-effort cleanup: cancel the SSE task if the monitor is still alive.
+    // `async` calls from `deinit` are not allowed, so we synchronously
+    // cancel the underlying task via the monitor's public stop().
+    Task { [commandMonitor] in
+      await commandMonitor?.stop()
+    }
+  }
 
   private func startCommandMonitor() async {
     guard let baseURL = aitherBaseURL, let authenticator = authenticator else {

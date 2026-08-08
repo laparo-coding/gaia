@@ -20,11 +20,8 @@ jobs:
       IOS_CERTIFICATE_PASSWORD: ${{ secrets['IOS_CERTIFICATE_PASSWORD'] }}
       IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets['IOS_PROVISIONING_PROFILE_BASE64'] }}
       IOS_KEYCHAIN_PASSWORD: ${{ secrets['IOS_KEYCHAIN_PASSWORD'] }}
-      IOS_WORKSPACE: ${{ vars['IOS_WORKSPACE'] }}
-      IOS_PROJECT: ${{ vars['IOS_PROJECT'] }}
-      IOS_SCHEME: ${{ vars['IOS_SCHEME'] }}
-      IOS_CONFIGURATION: ${{ vars['IOS_CONFIGURATION'] }}
       IOS_EXPORT_METHOD: ${{ vars['IOS_EXPORT_METHOD'] }}
+      IOS_CONFIGURATION: Release
       IOS_ARCHIVE_PATH: ${{ github.workspace }}/artifacts/GaiaApp.xcarchive
       IOS_EXPORT_PATH: ${{ github.workspace }}/artifacts/export
     steps:
@@ -67,32 +64,11 @@ jobs:
         run: |
           mkdir -p artifacts "$IOS_EXPORT_PATH"
 
-          xcode_target_args=()
-          if [[ -n "${IOS_WORKSPACE:-}" ]]; then
-            xcode_target_args+=( -workspace "$IOS_WORKSPACE" )
-          elif [[ -n "${IOS_PROJECT:-}" ]]; then
-            xcode_target_args+=( -project "$IOS_PROJECT" )
-          else
-            echo "Either IOS_WORKSPACE or IOS_PROJECT must be configured as repository variable"
-            exit 1
-          fi
-
-          if [[ -z "${IOS_SCHEME:-}" ]]; then
-            echo "IOS_SCHEME repository variable is required"
-            exit 1
-          fi
-
-          if [[ -z "${IOS_CONFIGURATION:-}" ]]; then
-            IOS_CONFIGURATION="Release"
-          fi
-
-          if [[ -z "${IOS_EXPORT_METHOD:-}" ]]; then
-            IOS_EXPORT_METHOD="ad-hoc"
-          fi
-
+          # SwiftPM-based build: generate Xcode project from Package.swift
+          # and archive using the SwiftPM-generated scheme.
+          xcodebuild -resolvePackageLocations
           xcodebuild archive \
-            "${xcode_target_args[@]}" \
-            -scheme "$IOS_SCHEME" \
+            -scheme GaiaControllerApp \
             -configuration "$IOS_CONFIGURATION" \
             -archivePath "$IOS_ARCHIVE_PATH" \
             -destination 'generic/platform=iOS' \

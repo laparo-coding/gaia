@@ -11,6 +11,11 @@ import Testing
 /// (not `GaiaCore`), these tests verify the delegate callback logic using
 /// a mock that replicates the same `hasPlayedOnce` + initial-seek + pause
 /// logic. The actual ViewModel extension is validated via manual E2E.
+///
+/// NOTE: A future refactor could extract the shared state-transition logic
+/// into a GaiaCore type (e.g. `PlaybackSessionStateMachine`) so both the
+/// ViewModel and tests use the same implementation. Until then, the mock
+/// is kept in sync manually.
 @Suite
 struct VideoPlayerViewModelPlaybackSyncTests {
   @Test

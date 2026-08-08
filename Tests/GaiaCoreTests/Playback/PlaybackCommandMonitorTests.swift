@@ -107,4 +107,78 @@ struct PlaybackCommandMonitorTests {
   func maxReconnectAttemptsIsTen() {
     #expect(PlaybackCommandMonitor.maxReconnectAttemptsForTesting == 10)
   }
+
+  // MARK: - Recording ID Validation
+
+  @Test
+  func validUUIDPassesThrough() {
+    let id = "550e8400-e29b-41d4-a716-446655440000"
+    #expect(PlaybackCommandMonitor.normalizedRecordingId(id) == id)
+  }
+
+  @Test
+  func validAlphanumericIdPassesThrough() {
+    let id = "recording_2024-06.prod"
+    #expect(PlaybackCommandMonitor.normalizedRecordingId(id) == id)
+  }
+
+  @Test
+  func whitespaceIsTrimmed() {
+    #expect(
+      PlaybackCommandMonitor.normalizedRecordingId("  abc-123  ") == "abc-123"
+    )
+  }
+
+  @Test
+  func emptyStringReturnsInvalid() {
+    #expect(PlaybackCommandMonitor.normalizedRecordingId("") == "invalid")
+  }
+
+  @Test
+  func whitespaceOnlyReturnsInvalid() {
+    #expect(PlaybackCommandMonitor.normalizedRecordingId("   ") == "invalid")
+  }
+
+  @Test
+  func controlCharactersReturnInvalid() {
+    #expect(
+      PlaybackCommandMonitor.normalizedRecordingId("rec\nording") == "invalid"
+    )
+  }
+
+  @Test
+  func excessivelyLongIdReturnsInvalid() {
+    let longId = String(repeating: "a", count: 129)
+    #expect(PlaybackCommandMonitor.normalizedRecordingId(longId) == "invalid")
+  }
+
+  @Test
+  func exactlyMaxLengthPassesThrough() {
+    let id = String(repeating: "a", count: 128)
+    #expect(PlaybackCommandMonitor.normalizedRecordingId(id) == id)
+  }
+
+  @Test
+  func slashCharacterReturnsInvalid() {
+    #expect(
+      PlaybackCommandMonitor.normalizedRecordingId("rec/ording") == "invalid"
+    )
+  }
+
+  @Test
+  func logInjectionPayloadReturnsInvalid() {
+    #expect(
+      PlaybackCommandMonitor.normalizedRecordingId("id%0d%0aInjected: true")
+        == "invalid"
+    )
+  }
+
+  // MARK: - Auth Retry Constants
+
+  @Test
+  func maxAuthRetriesIsTwo() {
+    // maxAuthRetries = 2 means: after 2 consecutive 401s, go offline.
+    // The boundary check uses >= so exactly 2 failures triggers offline.
+    #expect(PlaybackCommandMonitor.maxAuthRetriesForTesting == 2)
+  }
 }

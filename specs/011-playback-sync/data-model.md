@@ -12,7 +12,7 @@ No new data models. This feature reuses `ChapterSummary` (Spec 010) and the exis
 
 ```swift
 @MainActor
-protocol PlaybackCommandDelegate: AnyObject {
+protocol PlaybackCommandDelegate: AnyObject, Sendable {
   /// Called when a `play` SSE command is received.
   func onPlay()
   /// Called when a `stop` SSE command is received.
@@ -21,6 +21,8 @@ protocol PlaybackCommandDelegate: AnyObject {
   func onSeek(position: Double)
   /// Called when a `chapter-boundary` SSE command is received.
   func onChapterBoundary()
+  /// Called when the monitor goes offline after exhausting auth retries.
+  func onSyncOffline()
 }
 ```
 

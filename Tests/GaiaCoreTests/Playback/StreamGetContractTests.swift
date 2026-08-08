@@ -19,7 +19,10 @@ struct StreamGetContractTests {
       downstreamClient: downstream,
       cacheTTL: 60)
 
-    let result = await client.resolvePlaybackURL(assetId: "rec_test", requestID: "req-1")
+    // Pass nil transport to use the mock's default (not the real URLSession
+    // redirect-safe transport which would try to follow the 302).
+    let result = await client.resolvePlaybackURL(
+      assetId: "rec_test", requestID: "req-1", transport: nil)
     let error = try #require(result.playbackError)
     #expect(error == .invalidResponse)
   }

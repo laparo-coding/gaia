@@ -61,9 +61,11 @@ public struct DownstreamServiceClient: Sendable {
     requestId: String,
     body: Data? = nil,
     additionalHeaders: [String: String] = [:],
-    now: Date = Date()
+    now: Date = Date(),
+    transport: Transport? = nil
   ) async -> AuthorizedRequestResult<DownstreamServiceResponse> {
-    await runtime.executeAuthorizedServiceRequest(
+    let effectiveTransport = transport ?? self.transport
+    return await runtime.executeAuthorizedServiceRequest(
       service: service,
       operation: operation,
       requestId: requestId,
@@ -80,7 +82,7 @@ public struct DownstreamServiceClient: Sendable {
         additionalHeaders: additionalHeaders
       )
 
-      let (data, response) = try await transport(request)
+      let (data, response) = try await effectiveTransport(request)
       guard let httpResponse = response as? HTTPURLResponse else {
         throw AuthenticationError.serviceAuthorizationFailed(service: service)
       }

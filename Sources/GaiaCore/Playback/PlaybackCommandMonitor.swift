@@ -32,9 +32,22 @@ public actor PlaybackCommandMonitor {
 
   private var streamTask: Task<Void, Never>?
   private var isStopped = false
+  private var consecutiveAuthFailures = 0
 
   private static let reconnectBackoff: [Double] = [0.5, 1, 2, 5]
   private static let maxReconnectAttempts = 10
+  /// Maximum consecutive 401 responses before going offline immediately.
+  private static let maxAuthRetries = 2
+
+  /// Maximum allowed length for a `recordingId` (UUIDs are 36 chars).
+  private static let maxRecordingIdLength = 128
+
+  /// Allowed character set for `recordingId`: alphanumeric, hyphen, underscore, dot.
+  private static let allowedRecordingIdCharset: CharacterSet = {
+    var allowed = CharacterSet.alphanumerics
+    allowed.insert(charactersIn: "-_.")
+    return allowed.inverted
+  }()
 
   public init(
     baseURL: URL,
@@ -43,17 +56,37 @@ public actor PlaybackCommandMonitor {
     session: URLSession = .shared
   ) {
     self.baseURL = baseURL
-    self.recordingId = recordingId
+    self.recordingId = Self.normalizedRecordingId(recordingId)
     self.authenticator = authenticator
     self.session = session
   }
 
+  /// Validates and normalizes a `recordingId` for safe use in URL query items
+  /// and request metadata. Rejects values that are empty, exceed the length
+  /// limit, or contain characters outside the allowed charset.
+  ///
+  /// - Returns: The trimmed original string if valid, or `"invalid"` as a
+  ///   safe fallback that will still produce a well-formed request.
+  public static func normalizedRecordingId(_ raw: String) -> String {
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty,
+          trimmed.count <= Self.maxRecordingIdLength,
+          trimmed.rangeOfCharacter(from: Self.allowedRecordingIdCharset) == nil
+    else {
+      return "invalid"
+    }
+    return trimmed
+  }
+
   /// Starts the SSE subscription. The delegate is called on the main actor.
-  public func start(delegate: PlaybackCommandDelegate) async {
+  ///
+  /// The spawned `Task` holds a strong reference to the actor for the
+  /// duration of the stream. Call `stop()` to cancel the task and break
+  /// the reference cycle.
+  public func start(delegate: any PlaybackCommandDelegate) async {
     isStopped = false
     let delegateBox = DelegateBox(delegate: delegate)
-    streamTask = Task { [weak self] in
-      guard let self else { return }
+    streamTask = Task {
       await self.runEventStream(delegateBox: delegateBox)
     }
   }
@@ -80,12 +113,14 @@ public actor PlaybackCommandMonitor {
         }
 
         if httpResponse.statusCode == 401 {
-          // Token renewal + single retry (Clarification Q2)
-          let retried = try await handle401(delegate: delegateBox)
-          if !retried {
+          consecutiveAuthFailures += 1
+          if consecutiveAuthFailures >= Self.maxAuthRetries {
             await delegateBox.notifySyncOffline()
             return
           }
+          // Invalidate cached token so the next authorize() call fetches fresh credentials.
+          await authenticator.cacheStore.invalidate(service: .aither)
+          attempt = await reconnect(attempt: attempt, delegate: delegateBox)
           continue
         }
 
@@ -93,8 +128,9 @@ public actor PlaybackCommandMonitor {
           throw PlaybackSyncError.httpError(statusCode: httpResponse.statusCode)
         }
 
-        // Reset attempt counter on successful connection
+        // Reset attempt and auth-failure counters on successful connection
         attempt = 0
+        consecutiveAuthFailures = 0
 
         // Parse SSE lines
         var buffer = ""
@@ -141,10 +177,12 @@ public actor PlaybackCommandMonitor {
   // MARK: - Request
 
   private func makeRequest() async throws -> URLRequest {
-    var components = URLComponents(
+    guard var components = URLComponents(
       url: baseURL.appendingPathComponent("api/recording/events"),
       resolvingAgainstBaseURL: false
-    )!
+    ) else {
+      throw PlaybackSyncError.invalidURL
+    }
     components.queryItems = [URLQueryItem(name: "recordingId", value: recordingId)]
 
     guard let url = components.url else {
@@ -174,15 +212,11 @@ public actor PlaybackCommandMonitor {
 
   // MARK: - 401 Handling
 
-  private func handle401(delegate: DelegateBox) async throws -> Bool {
-    // The authenticator's cacheStore should be invalidated externally.
-    // On retry, authorize() will re-call the tokenProvider.
-    // If the retry also returns 401, we stop.
-    // For now, we attempt a single re-authorize and let the next loop iteration
-    // re-request. If that also fails, the caller will see another 401 and
-    // call onSyncOffline().
-    return true
-  }
+  // 401 recovery is handled inline in `runEventStream`:
+  // 1. Increment `consecutiveAuthFailures`.
+  // 2. If the limit (`maxAuthRetries`) is exceeded, go offline immediately.
+  // 3. Otherwise, invalidate the Aither token cache so the next `authorize()`
+  //    call fetches fresh credentials, then reconnect with backoff.
 
   // MARK: - Reconnect
 
@@ -250,6 +284,11 @@ public actor PlaybackCommandMonitor {
     maxReconnectAttempts
   }
 
+  /// Test hook for max auth retries before going offline.
+  public static var maxAuthRetriesForTesting: Int {
+    maxAuthRetries
+  }
+
   // MARK: - Dispatch
 
   private func dispatchCommand(
@@ -279,42 +318,42 @@ enum PlaybackSyncError: Error, Sendable {
 
 // MARK: - DelegateBox (Sendable wrapper for @MainActor delegate)
 
-/// Sendable wrapper that holds a weak reference to the `@MainActor`-isolated
-/// delegate and dispatches callbacks via `MainActor.run`.
-final class DelegateBox: @unchecked Sendable {
-  private weak var delegate: AnyObject?
+/// Actor that holds a weak reference to the `@MainActor`-isolated delegate
+/// and dispatches callbacks via `MainActor.run`.
+///
+/// Using an actor (instead of `@unchecked Sendable`) gives us:
+/// - Automatic `Sendable` conformance without compiler bypasses.
+/// - Safe mutable state (`weak var delegate`) protected by actor isolation.
+/// - Typed storage (`any PlaybackCommandDelegate`) instead of `AnyObject`.
+actor DelegateBox {
+  private weak var delegate: (any PlaybackCommandDelegate)?
 
-  init(delegate: PlaybackCommandDelegate) {
-    self.delegate = delegate as AnyObject
+  init(delegate: any PlaybackCommandDelegate) {
+    self.delegate = delegate
   }
 
-  func notifyPlay() async {
-    await MainActor.run { [weak self] in
-      (self?.delegate as? PlaybackCommandDelegate)?.onPlay()
-    }
+  nonisolated func notifyPlay() async {
+    let d = await delegate
+    await MainActor.run { d?.onPlay() }
   }
 
-  func notifyStop() async {
-    await MainActor.run { [weak self] in
-      (self?.delegate as? PlaybackCommandDelegate)?.onStop()
-    }
+  nonisolated func notifyStop() async {
+    let d = await delegate
+    await MainActor.run { d?.onStop() }
   }
 
-  func notifySeek(position: Double) async {
-    await MainActor.run { [weak self] in
-      (self?.delegate as? PlaybackCommandDelegate)?.onSeek(position: position)
-    }
+  nonisolated func notifySeek(position: Double) async {
+    let d = await delegate
+    await MainActor.run { d?.onSeek(position: position) }
   }
 
-  func notifyChapterBoundary() async {
-    await MainActor.run { [weak self] in
-      (self?.delegate as? PlaybackCommandDelegate)?.onChapterBoundary()
-    }
+  nonisolated func notifyChapterBoundary() async {
+    let d = await delegate
+    await MainActor.run { d?.onChapterBoundary() }
   }
 
-  func notifySyncOffline() async {
-    await MainActor.run { [weak self] in
-      (self?.delegate as? PlaybackCommandDelegate)?.onSyncOffline()
-    }
+  nonisolated func notifySyncOffline() async {
+    let d = await delegate
+    await MainActor.run { d?.onSyncOffline() }
   }
 }
