@@ -4,6 +4,95 @@ import Testing
 
 struct LocalEnvironmentTests {
   @Test
+  func mergedEnvironmentUsesOpenRouterKeychainFallbackWhenEnvIsMissing() {
+    var environment = ["GAIA_ENV": "development"]
+    LocalEnvironment.populateOpenRouterKeyIfNeeded(
+      in: &environment,
+      processEnvironment: ["USER": "test-user"],
+      keychainSecretReader: { accountName, service in
+        #expect(accountName == "test-user")
+        #expect(service == LocalEnvironment.openRouterKeychainService)
+        return "keychain-openrouter-token"
+      }
+    )
+
+    #expect(environment[LocalEnvironment.openRouterAPIKeyKey] == "keychain-openrouter-token")
+    #expect(environment[LocalEnvironment.openRouterLegacyAPIKeyKey] == nil)
+  }
+
+  @Test
+  func mergedEnvironmentDoesNotOverrideExistingOpenRouterKey() {
+    var environment = [LocalEnvironment.openRouterAPIKeyKey: "env-token"]
+    LocalEnvironment.populateOpenRouterKeyIfNeeded(
+      in: &environment,
+      processEnvironment: ["USER": "test-user"],
+      keychainSecretReader: { _, _ in
+        Issue.record("keychain fallback should not run when env already has a token")
+        return "unexpected"
+      }
+    )
+
+    #expect(environment[LocalEnvironment.openRouterAPIKeyKey] == "env-token")
+    #expect(environment[LocalEnvironment.openRouterLegacyAPIKeyKey] == nil)
+  }
+
+  @Test
+  func normalizeOpenRouterEnvironmentPromotesLegacyKeyToCanonicalKey() {
+    var environment = [LocalEnvironment.openRouterLegacyAPIKeyKey: "legacy-token"]
+
+    LocalEnvironment.normalizeOpenRouterEnvironment(in: &environment)
+
+    #expect(environment[LocalEnvironment.openRouterAPIKeyKey] == "legacy-token")
+    #expect(environment[LocalEnvironment.openRouterLegacyAPIKeyKey] == nil)
+  }
+
+  @Test
+  func openRouterDiagnosticReportsConfiguredTokenSafely() {
+    let message = LocalEnvironment.openRouterDiagnosticMessage(
+      appName: "GaiaCLI",
+      environment: [
+        "GAIA_OPENROUTER_DIAGNOSTICS": "true",
+        LocalEnvironment.openRouterAPIKeyKey: "secret-token"
+      ]
+    )
+
+    #expect(message == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 12).")
+  }
+
+  @Test
+  func openRouterDiagnosticReportsMissingToken() {
+    let message = LocalEnvironment.openRouterDiagnosticMessage(
+      appName: "GaiaCLI",
+      environment: ["GAIA_OPENROUTER_DIAGNOSTICS": "true"]
+    )
+
+    #expect(message == "[OpenRouter] deaktiviert fuer GaiaCLI: kein GAIA_OPENROUTER_API_KEY gesetzt.")
+  }
+
+  @Test
+  func openRouterDiagnosticNormalizesLegacyTokenToCanonicalSource() {
+    let message = LocalEnvironment.openRouterDiagnosticMessage(
+      appName: "GaiaCLI",
+      environment: [
+        "GAIA_OPENROUTER_DIAGNOSTICS": "true",
+        LocalEnvironment.openRouterLegacyAPIKeyKey: "legacy-secret"
+      ]
+    )
+
+    #expect(message == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 13).")
+  }
+
+  @Test
+  func openRouterDiagnosticStaysSilentWhenDisabled() {
+    let message = LocalEnvironment.openRouterDiagnosticMessage(
+      appName: "GaiaCLI",
+      environment: [LocalEnvironment.openRouterAPIKeyKey: "secret-token"]
+    )
+
+    #expect(message == nil)
+  }
+
+  @Test
   func parsesPlainAssignment() {
     let entry = LocalEnvironment.parse(line: "GAIA_ROLLBAR_ACCESS_TOKEN=token-value")
 

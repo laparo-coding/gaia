@@ -27,15 +27,19 @@ struct ChapterSeekLogicTests {
     let chapters: [ChapterSummary] = [
       try ChapterSummary(id: 0, start: 5.0, end: 20.0, title: "Chapter 1"),
       try ChapterSummary(id: 1, start: 20.0, end: 45.0, title: "Chapter 2"),
+      try ChapterSummary(id: 2, start: 45.0, end: 90.0, title: "Chapter 3"),
     ]
 
     // Paused just before chapter 1 start (19.999): next is chapter 1.
-    // At exactly 20.0 (chapter 1 start), there is no chapter with start > 20.0
-    // in this 2-chapter list, so the button would be disabled — consistent with
-    // FR-002's strict "start > currentPosition" rule.
     let next = ChapterSeekLogic.nextChapter(chapters: chapters, currentPosition: 19.999)
     let unwrapped = try #require(next)
     #expect(unwrapped.id == 1)
+
+    // At exactly 20.0 (chapter 1 start): next is chapter 2 (start 45.0 > 20.0).
+    let nextAtBoundary = ChapterSeekLogic.nextChapter(chapters: chapters, currentPosition: 20.0)
+    let unwrappedAtBoundary = try #require(nextAtBoundary)
+    #expect(unwrappedAtBoundary.id == 2)
+    #expect(unwrappedAtBoundary.start == 45.0)
   }
 
   @Test

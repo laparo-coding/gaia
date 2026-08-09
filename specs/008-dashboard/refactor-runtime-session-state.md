@@ -112,5 +112,5 @@ either duplicate the constructor pattern or push view-layer concerns into
 
 - `swift build` — passes (the file is part of the SwiftPM target).
 - `swift test` — all suites that exercise authentication still pass.
-- `xcodebuild -scheme GaiaControllerApp -destination 'generic/platform=iOS Simulator' build`
-  — passes (the four pbxproj references resolve the file correctly).
+- `scripts/ci-cd/build-ipados-swiftpm.sh`
+  — passes (uses canonical SDK path and target triple).

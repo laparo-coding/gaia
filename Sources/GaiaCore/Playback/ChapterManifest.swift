@@ -3,6 +3,7 @@ import Foundation
 /// Validation errors for chapter manifest entities (Spec 010, data-model.md).
 public enum ChapterManifestValidationError: Error, Equatable, Sendable {
   case startMustBeLessThanEnd
+  case startMustNotBeNegative
   case idsMustBeMonotonic
   case chaptersMustNotOverlap
   case chaptersMustNotBeEmpty
@@ -17,6 +18,9 @@ public struct ChapterSummary: Equatable, Sendable {
   public let title: String
 
   public init(id: Int, start: Double, end: Double, title: String) throws {
+    guard start >= 0 else {
+      throw ChapterManifestValidationError.startMustNotBeNegative
+    }
     guard start < end else {
       throw ChapterManifestValidationError.startMustBeLessThanEnd
     }
@@ -81,13 +85,37 @@ extension ChapterListResponse: Decodable {
   }
 }
 
-/// Response from `POST /api/recording/chapters/[id]` (Spec 010 FR-005).
+/// Result of a chapter-regeneration request (Spec 010 FR-005).
+///
+/// Returned by ``PlaybackClient/regenerate(assetId:requestID:now:)`` after
+/// Aither re-encodes chapter metadata for a recording.
 public struct ChapterRegenerationResult: Equatable, Sendable {
+  /// The original recording / asset identifier.
   public let assetId: String
+
+  /// The Mux asset identifier produced by the regeneration pipeline.
   public let muxAssetId: String
+
+  /// Total number of chapters in the regenerated manifest.
   public let chapterCount: Int
 
-  public init(assetId: String, muxAssetId: String, chapterCount: Int) {
+  /// Creates a new regeneration result.
+  ///
+  /// - Parameters:
+  ///   - assetId: The original recording identifier.
+  ///   - muxAssetId: The Mux asset identifier. Must not be empty; an empty
+  ///     value throws ``ChapterManifestValidationError/chaptersMustNotBeEmpty``.
+  ///   - chapterCount: The number of chapters. Must be positive; a non-positive
+  ///     value throws ``ChapterManifestValidationError/chaptersMustNotBeEmpty``.
+  /// - Throws: ``ChapterManifestValidationError/chaptersMustNotBeEmpty`` if
+  ///   `muxAssetId` is empty or `chapterCount` is not positive.
+  public init(assetId: String, muxAssetId: String, chapterCount: Int) throws {
+    guard !muxAssetId.isEmpty else {
+      throw ChapterManifestValidationError.chaptersMustNotBeEmpty
+    }
+    guard chapterCount > 0 else {
+      throw ChapterManifestValidationError.chaptersMustNotBeEmpty
+    }
     self.assetId = assetId
     self.muxAssetId = muxAssetId
     self.chapterCount = chapterCount
@@ -95,6 +123,14 @@ public struct ChapterRegenerationResult: Equatable, Sendable {
 }
 
 extension ChapterRegenerationResult: Decodable {
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    let assetId = try container.decode(String.self, forKey: .assetId)
+    let muxAssetId = try container.decode(String.self, forKey: .muxAssetId)
+    let chapterCount = try container.decode(Int.self, forKey: .chapterCount)
+    try self.init(assetId: assetId, muxAssetId: muxAssetId, chapterCount: chapterCount)
+  }
+
   private enum CodingKeys: String, CodingKey {
     case assetId, muxAssetId, chapterCount
   }

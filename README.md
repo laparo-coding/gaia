@@ -51,6 +51,24 @@ On macOS you can validate the token against Rollbar and store it in Keychain:
 bash scripts/rollbar-keychain-setup.sh
 ```
 
+OpenRouter keys can also be stored in Keychain with:
+
+```bash
+bash scripts/openrouter-keychain-setup.sh
+```
+
+To start VS Code itself with the OpenRouter key from Keychain in the process
+environment, use:
+
+```bash
+bash scripts/open-vscode-with-openrouter.sh .
+```
+
+Gaia normalizes OpenRouter configuration to `GAIA_OPENROUTER_API_KEY`.
+`OPENROUTER_API_KEY` is accepted only as a legacy fallback in the shell or
+`.env.local`. When neither value is present, Gaia falls back to the macOS
+Keychain entry `openrouter-gaia-api-key`.
+
 For short-lived processes such as `GaiaCLI`, Gaia waits 1 second on shutdown so
 the Rollbar Apple SDK can finish async delivery. Override this with
 `GAIA_ROLLBAR_DELIVERY_WAIT_SECONDS` or `ROLLBAR_DELIVERY_WAIT_SECONDS` if you

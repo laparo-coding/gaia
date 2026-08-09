@@ -104,10 +104,15 @@ public struct PlaybackClient: Sendable {
 
   /// Resolves the MUX CDN playback URL for `assetId` by following the HTTP 302
   /// redirect from `GET /api/recording/stream/[id]`.
+  ///
+  /// Uses a dedicated `URLSession` with a delegate that strips the
+  /// `Authorization` header on cross-host redirects, preventing credential
+  /// leakage to the Mux CDN while preserving same-host authorization.
   public func resolvePlaybackURL(
     assetId: String,
     requestID: String,
-    now: Date = Date()
+    now: Date = Date(),
+    transport: DownstreamServiceClient.Transport? = nil
   ) async -> PlaybackClientResult<URL> {
     let path = "api/recording/stream/\(urlEncode(assetId))"
     let result = await downstreamClient.send(
@@ -117,10 +122,25 @@ public struct PlaybackClient: Sendable {
       method: "GET",
       operation: "playback:resolve_stream",
       requestId: requestID,
-      now: now
+      now: now,
+      transport: transport
     )
 
     return await mapStreamResponse(result)
+  }
+
+  /// Transport that uses a dedicated `URLSession` with a redirect delegate.
+  /// The delegate strips the `Authorization` header when the redirect target
+  /// origin (scheme + host + port) differs from the original request, preventing
+  /// credential leakage to external CDNs (e.g. Aither → Mux) and to
+  /// HTTPS-to-HTTP or same-host different-port redirects.
+  public static let redirectSafeTransport: DownstreamServiceClient.Transport = { request in
+    let originalURL = request.url
+    let delegate = RedirectDelegate(originalURL: originalURL)
+    let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
+    defer { session.finishTasksAndInvalidate() }
+    let (data, response) = try await session.data(for: request)
+    return (data, response)
   }
 
   // MARK: - Response mapping (T017)
@@ -193,7 +213,10 @@ public struct PlaybackClient: Sendable {
       return PlaybackClientResult(value: nil, playbackError: .invalidResponse)
     }
 
-    if (300...399).contains(response.statusCode) {
+    // Only 302 redirects are treated as successful stream resolution.
+    // All other 3xx responses (301, 303, 307, 308, etc.) are classified
+    // as stream failures (Spec 010 FR-008).
+    if response.statusCode == 302 {
       if let location = response.headers["Location"]
         ?? response.headers["location"],
         let url = URL(string: location)
@@ -201,6 +224,10 @@ public struct PlaybackClient: Sendable {
         return PlaybackClientResult(value: url, playbackError: nil)
       }
 
+      return PlaybackClientResult(value: nil, playbackError: .invalidResponse)
+    }
+
+    if (300...399).contains(response.statusCode) {
       return PlaybackClientResult(value: nil, playbackError: .invalidResponse)
     }
 
@@ -326,5 +353,42 @@ private actor ChapterListCache {
   func invalidate(assetId: String) {
     versions[assetId, default: 0] += 1
     entries[assetId] = nil
+  }
+}
+
+// MARK: - Redirect Delegate
+
+/// `URLSessionTaskDelegate` that strips the `Authorization` header on
+/// cross-host HTTP redirects. Same-host redirects (e.g. HTTP → HTTPS)
+/// preserve the header.
+private final class RedirectDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+  /// The original request URL whose origin (scheme + host + port) is used
+  /// to decide whether to retain the `Authorization` header on redirects.
+  let originalURL: URL?
+
+  init(originalURL: URL?) {
+    self.originalURL = originalURL
+  }
+
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping (URLRequest?) -> Void
+  ) {
+    var redirectedRequest = request
+    if !isSameOrigin(originalURL, request.url) {
+      redirectedRequest.setValue(nil, forHTTPHeaderField: "Authorization")
+    }
+    completionHandler(redirectedRequest)
+  }
+
+  /// Returns `true` when both URLs share the same scheme, host, and port.
+  private func isSameOrigin(_ lhs: URL?, _ rhs: URL?) -> Bool {
+    guard let lhs, let rhs else { return false }
+    return lhs.scheme == rhs.scheme
+      && lhs.host == rhs.host
+      && lhs.port == rhs.port
   }
 }

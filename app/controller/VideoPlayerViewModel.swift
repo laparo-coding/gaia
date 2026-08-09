@@ -16,7 +16,7 @@ import AVFoundation
 /// R4), and exposes the "Next Chapter" seek action as a client-side seek
 /// (FR-002, NFR-001 ≤ 200 ms).
 @MainActor
-final class VideoPlayerViewModel: ObservableObject {
+final class VideoPlayerViewModel: ObservableObject, PlaybackCommandDelegate {
   /// Player lifecycle state (data-model.md State Transitions).
   enum State: Equatable {
     case unloaded
@@ -32,6 +32,18 @@ final class VideoPlayerViewModel: ObservableObject {
   @Published private(set) var chapters: [ChapterSummary] = []
   @Published private(set) var currentPosition: Double = 0.0
   @Published private(set) var regenerationError: PlaybackError?
+  @Published private(set) var syncOffline: Bool = false
+
+  /// Tracks whether the initial seek to chapters[0].start has been performed
+  /// (Spec 011, FR-004). Prevents re-seeking on subsequent play commands.
+  private var hasPlayedOnce: Bool = false
+
+  /// SSE playback command monitor (Spec 011, FR-001).
+  private var commandMonitor: PlaybackCommandMonitor?
+  /// Aither base URL for SSE connection.
+  private var aitherBaseURL: URL?
+  /// Authenticator for Aither SSE auth (Spec 005).
+  private var authenticator: AitherServiceAuthenticator?
 
   /// The next chapter to seek to, or `nil` when in/past the last chapter (FR-004)
   /// or when chapters are not available (FR-004a).
@@ -68,6 +80,13 @@ final class VideoPlayerViewModel: ObservableObject {
     self.assetId = assetId
   }
 
+  /// Configures the Aither SSE connection parameters (Spec 011, FR-001).
+  /// Call before `preparePlayer` to enable playback sync.
+  func configurePlaybackSync(baseURL: URL, authenticator: AitherServiceAuthenticator) {
+    self.aitherBaseURL = baseURL
+    self.authenticator = authenticator
+  }
+
   // MARK: - Load (FR-001 + FR-003)
 
   func loadChapters(requestID: String) async {
@@ -97,7 +116,8 @@ final class VideoPlayerViewModel: ObservableObject {
   /// `AVPlayer`. Must be called on the main actor.
   func preparePlayer(requestID: String) async {
     let result = await playbackClient.resolvePlaybackURL(
-      assetId: assetId, requestID: requestID)
+      assetId: assetId, requestID: requestID,
+      transport: PlaybackClient.redirectSafeTransport)
 
     guard let url = result.value else {
       state = .failed(result.playbackError ?? .invalidResponse)
@@ -113,6 +133,9 @@ final class VideoPlayerViewModel: ObservableObject {
     attachTimeObserver(to: player)
     #endif
     state = .ready
+
+    // Spec 011, FR-001: Start SSE playback command monitor after player is ready.
+    await startCommandMonitor()
   }
 
   func play() {
@@ -129,6 +152,92 @@ final class VideoPlayerViewModel: ObservableObject {
     if state == .playing {
       state = .ready
     }
+  }
+
+  // MARK: - PlaybackCommandDelegate (Spec 011)
+
+  func onPlay() {
+    // Spec 011, FR-004: On first play, seek to chapters[0].start (deterministic,
+    // position-independent). hasPlayedOnce prevents re-seeking.
+    if !hasPlayedOnce && chapters.count > 0 {
+      #if canImport(AVFoundation)
+      let target = CMTime(seconds: chapters[0].start, preferredTimescale: 600)
+      player?.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+      #endif
+      currentPosition = chapters[0].start
+    }
+    hasPlayedOnce = true
+    play()
+  }
+
+  func onStop() {
+    pause()
+  }
+
+  func onSeek(position: Double) {
+    #if canImport(AVFoundation)
+    let target = CMTime(seconds: position, preferredTimescale: 600)
+    player?.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+    #endif
+    currentPosition = position
+  }
+
+  func onChapterBoundary() {
+    // Spec 011, FR-005: Pause to stay in sync with Aither web player.
+    pause()
+  }
+
+  func onSyncOffline() {
+    // Spec 011, NFR-003: Show UI hint; player remains manually operable.
+    syncOffline = true
+  }
+
+  // MARK: - SSE Monitor Lifecycle
+
+  deinit {
+    // Best-effort cleanup: cancel the SSE task if the monitor is still alive.
+    // `async` calls from `deinit` are not allowed, so we synchronously
+    // cancel the underlying task via the monitor's public stop().
+    Task { [commandMonitor] in
+      await commandMonitor?.stop()
+    }
+  }
+
+  private func startCommandMonitor() async {
+    guard let baseURL = aitherBaseURL, let authenticator = authenticator else {
+      return
+    }
+    await commandMonitor?.stop()
+    let monitor = PlaybackCommandMonitor(
+      baseURL: baseURL,
+      recordingId: assetId,
+      authenticator: authenticator
+    )
+    commandMonitor = monitor
+    await monitor.start(delegate: self)
+  }
+
+  private func stopCommandMonitor() async {
+    await commandMonitor?.stop()
+    commandMonitor = nil
+  }
+
+  // MARK: - Test Hooks
+
+  /// Test hook: set chapters directly (bypasses network fetch).
+  internal func setChaptersForTesting(_ newChapters: [ChapterSummary]) {
+    chapters = newChapters
+    state = .ready
+  }
+
+  /// Test hook: set current position directly.
+  internal func setCurrentPositionForTesting(_ position: Double) {
+    currentPosition = position
+  }
+
+  /// Test hook: read hasPlayedOnce flag.
+  internal var hasPlayedOnceForTesting: Bool {
+    hasPlayedOnce
   }
 
   // MARK: - Next Chapter (FR-002, client-side seek, NFR-001)

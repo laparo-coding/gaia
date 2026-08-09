@@ -1,6 +1,15 @@
 import Foundation
 
 public enum LocalEnvironment {
+  static let openRouterAPIKeyKey = "GAIA_OPENROUTER_API_KEY"
+  static let openRouterLegacyAPIKeyKey = "OPENROUTER_API_KEY"
+  static let openRouterKeychainService = "openrouter-gaia-api-key"
+
+  struct TokenConfiguration: Equatable {
+    let source: String
+    let value: String
+  }
+
   public static let dashboardCacheTTLKey = "GAIA_DASHBOARD_CACHE_TTL_SECONDS"
   public static let dashboardStatusEventsEndpointKey = "GAIA_DASHBOARD_SSE_ENDPOINT"
   /// Environment key for the active runtime environment (`development`, `test`, `production`).
@@ -183,6 +192,44 @@ public enum LocalEnvironment {
     return isRunningInDocker()
   }
 
+  /// Validates and parses a raw URL string into a `URL`.
+  ///
+  /// Shared trimming and validation rules used by `authBaseURL(in:)`,
+  /// `serviceBaseURL(_:in:)`, and `configuredServiceBaseURLCandidates(_:in:)`:
+  /// non-empty after trimming, absolute URL with `http` or `https` scheme,
+  /// and a non-nil host.
+  ///
+  /// - Parameter rawValue: The raw URL string (already trimmed by the caller
+  ///   or passed as-is).
+  /// - Returns: A validated absolute `URL`, or `nil` when the value is blank
+  ///   or malformed.
+  private static func validatedURL(rawValue: String) -> URL? {
+    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty else { return nil }
+    guard
+      let url = URL(string: trimmed),
+      let scheme = url.scheme?.lowercased(),
+      scheme == "http" || scheme == "https",
+      url.host != nil
+    else {
+      return nil
+    }
+    return url
+  }
+
+  /// Resolves the configured authentication base URL from the environment.
+  ///
+  /// Uses the same trimming and validation rules as `serviceBaseURL(_:in:)`:
+  /// non-empty, absolute URL with `http` or `https` scheme and a non-nil host.
+  ///
+  /// - Parameter environment: The merged environment dictionary.
+  /// - Returns: A validated absolute `URL` carrying a scheme, or `nil` when
+  ///   the key is absent or blank (auth base URL is optional in development).
+  public static func authBaseURL(in environment: [String: String]) -> URL? {
+    guard let rawValue = environment[authBaseURLKey] else { return nil }
+    return validatedURL(rawValue: rawValue)
+  }
+
   /// Resolves the configured base URL for a downstream service, failing
   /// explicitly when the value is missing or malformed.
   ///
@@ -197,18 +244,12 @@ public enum LocalEnvironment {
   ) throws -> URL {
     let key = baseURLKey(for: service)
 
-    guard
-      let rawValue = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
-      !rawValue.isEmpty
+    guard let rawValue = environment[key], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
       throw ConfigurationError.missingServiceBaseURL(service: service, key: key)
     }
 
-    guard
-      let url = URL(string: rawValue),
-      let scheme = url.scheme?.lowercased(),
-      scheme == "http" || scheme == "https",
-      url.host != nil
+    guard let url = validatedURL(rawValue: rawValue)
     else {
       throw ConfigurationError.invalidServiceBaseURL(service: service, key: key, value: rawValue)
     }
@@ -324,18 +365,12 @@ public enum LocalEnvironment {
 
     var urls: [URL] = []
     for key in keys {
-      guard
-        let rawValue = environment[key]?.trimmingCharacters(in: .whitespacesAndNewlines),
-        !rawValue.isEmpty
+      guard let rawValue = environment[key], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else {
         continue
       }
 
-      guard
-        let url = URL(string: rawValue),
-        let scheme = url.scheme?.lowercased(),
-        scheme == "http" || scheme == "https",
-        url.host != nil
+      guard let url = validatedURL(rawValue: rawValue)
       else {
         throw ConfigurationError.invalidServiceBaseURL(service: service, key: key, value: rawValue)
       }
@@ -475,7 +510,28 @@ public enum LocalEnvironment {
       at: repositoryRoot.appendingPathComponent(".env.local", isDirectory: false)
     )
 
-    return fileEnvironment.merging(processEnvironment) { _, processValue in processValue }
+    var mergedEnvironment = fileEnvironment.merging(processEnvironment) { _, processValue in
+      processValue
+    }
+
+    normalizeOpenRouterEnvironment(in: &mergedEnvironment)
+    populateOpenRouterKeyIfNeeded(in: &mergedEnvironment, processEnvironment: processEnvironment)
+    return mergedEnvironment
+  }
+
+  public static func openRouterDiagnosticMessage(
+    appName: String,
+    environment: [String: String]
+  ) -> String? {
+    guard shouldEmitOpenRouterDiagnostics(from: environment) else {
+      return nil
+    }
+
+    if let token = resolvedOpenRouterAccessToken(from: environment) {
+      return "[OpenRouter] aktiv fuer \(appName) (token source: \(token.source), token length: \(token.value.count))."
+    }
+
+    return "[OpenRouter] deaktiviert fuer \(appName): kein GAIA_OPENROUTER_API_KEY gesetzt."
   }
 
   public static func dashboardCacheTTL(in environment: [String: String]) -> TimeInterval {
@@ -627,5 +683,119 @@ public enum LocalEnvironment {
     }
 
     return value
+  }
+
+  static func resolvedOpenRouterAccessToken(from environment: [String: String]) -> TokenConfiguration? {
+    var normalizedEnvironment = environment
+    normalizeOpenRouterEnvironment(in: &normalizedEnvironment)
+
+    guard
+      let value = normalizedEnvironment[openRouterAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines),
+      !value.isEmpty
+    else {
+      return nil
+    }
+
+    return TokenConfiguration(source: openRouterAPIKeyKey, value: value)
+  }
+
+  static func shouldEmitOpenRouterDiagnostics(from environment: [String: String]) -> Bool {
+    for key in ["GAIA_OPENROUTER_DIAGNOSTICS", "OPENROUTER_DIAGNOSTICS"] {
+      let value = environment[key]?
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+        .lowercased()
+
+      switch value {
+      case "1", "true", "yes", "on":
+        return true
+      default:
+        continue
+      }
+    }
+
+    return false
+  }
+
+  static func populateOpenRouterKeyIfNeeded(
+    in environment: inout [String: String],
+    processEnvironment: [String: String],
+    keychainSecretReader: (String, String) -> String? = defaultKeychainSecretReader
+  ) {
+    normalizeOpenRouterEnvironment(in: &environment)
+
+    guard isBlank(environment[openRouterAPIKeyKey]) else {
+      return
+    }
+
+    let accountName = processEnvironment["USER"] ?? NSUserName()
+    guard let keychainValue = keychainSecretReader(accountName, openRouterKeychainService) else {
+      return
+    }
+
+    let normalizedValue = keychainValue.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalizedValue.isEmpty else {
+      return
+    }
+
+    environment[openRouterAPIKeyKey] = normalizedValue
+  }
+
+  static func normalizeOpenRouterEnvironment(in environment: inout [String: String]) {
+    let canonicalValue = environment[openRouterAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let legacyValue = environment[openRouterLegacyAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+    if isBlank(canonicalValue), let legacyValue, !legacyValue.isEmpty {
+      environment[openRouterAPIKeyKey] = legacyValue
+    }
+
+    environment.removeValue(forKey: openRouterLegacyAPIKeyKey)
+  }
+
+  static func isBlank(_ value: String?) -> Bool {
+    guard let value else {
+      return true
+    }
+
+    return value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+
+  static func defaultKeychainSecretReader(accountName: String, service: String) -> String? {
+    #if os(macOS)
+      let process = Process()
+      process.executableURL = URL(fileURLWithPath: "/usr/bin/security")
+      process.arguments = [
+        "find-generic-password",
+        "-a",
+        accountName,
+        "-s",
+        service,
+        "-w",
+      ]
+
+      let outputPipe = Pipe()
+      process.standardOutput = outputPipe
+      process.standardError = Pipe()
+
+      do {
+        try process.run()
+      } catch {
+        return nil
+      }
+
+      process.waitUntilExit()
+      guard process.terminationStatus == 0 else {
+        return nil
+      }
+
+      let data = outputPipe.fileHandleForReading.readDataToEndOfFile()
+      guard let output = String(data: data, encoding: .utf8) else {
+        return nil
+      }
+
+      let trimmedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
+      return trimmedOutput.isEmpty ? nil : trimmedOutput
+    #else
+      return nil
+    #endif
   }
 }

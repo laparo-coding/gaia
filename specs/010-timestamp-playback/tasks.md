@@ -83,7 +83,7 @@
 - [x] T027 Run `swift test` and `swift format lint --strict` before review; fix any failures
 - [x] T028 ~~Validate all quickstart.md scenarios (8 validation scenarios) on iPad landscape (Constitution device scope)~~ — Superseded: Gaia targets iPadOS landscape, but iPadOS build and device validation are not quality gates for Spec 010.
 - [ ] T029 `Tests/GaiaCoreTests/Playback/StreamFailureContractTests.swift`: contract test mocking `503 Service Unavailable` from `GET /api/recording/stream/[id]`, verifying player enters `streamUnavailable` state, retry recovers to `ready` (FR-008, NFR-004)
-- [ ] T030 [P] `Tests/GaiaCoreTests/Playback/StreamFailureContractTests.swift`: contract test mocking request timeout from `GET /api/recording/stream/[id]`, verifying player enters `streamUnavailable` state, retry recovers to `ready` (FR-008, NFR-004)
+- [ ] T030 `Tests/GaiaCoreTests/Playback/StreamFailureContractTests.swift`: contract test mocking request timeout from `GET /api/recording/stream/[id]`, verifying player enters `streamUnavailable` state, retry recovers to `ready` (FR-008, NFR-004)
 - [ ] T031 `Tests/GaiaCoreTests/Playback/StreamFailureContractTests.swift`: unit test verifying disabled-retry reset — after 3 failures the retry button is disabled; on navigation-away + re-entry or dashboard refresh the counter resets and retry is re-enabled (FR-008)
 
 ## Dependencies

@@ -115,10 +115,13 @@ struct PlaybackClientTests {
   func resolvesPlaybackURLFromRedirect() async throws {
     let runtime = try PlaybackTestSupport.makeRuntime()
     let muxURL = "https://stream.mux.com/playback-id.m3u8"
-    let downstream = DownstreamServiceClient(runtime: runtime) { request in
-      let response = PlaybackTestSupport.response(
-        for: request, statusCode: 302, headerFields: ["Location": muxURL])
-      return (Data(), response)
+    // The mock simulates an already-followed redirect: returns 200 with the
+    // redirect target as the response URL (as URLSession would after following).
+    let downstream = DownstreamServiceClient(runtime: runtime) { _ in
+      let redirectURL = URL(string: muxURL)!
+      let httpResponse = HTTPURLResponse(
+        url: redirectURL, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+      return (Data(), httpResponse)
     }
 
     let client = PlaybackClient(
@@ -126,8 +129,10 @@ struct PlaybackClientTests {
       downstreamClient: downstream,
       cacheTTL: 60)
 
+    // Pass nil transport to use the mock's default transport (not the real URLSession).
     let result = await client.resolvePlaybackURL(
-      assetId: "rec_stream_test", requestID: "req-1")
+      assetId: "rec_stream_test", requestID: "req-1",
+      transport: nil)
     let playbackURL = try #require(result.value)
     #expect(playbackURL.absoluteString == muxURL)
   }

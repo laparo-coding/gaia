@@ -238,7 +238,7 @@ _Prerequisites: research.md complete_
    loaded, "Next Chapter" seeks correctly, regeneration trigger works against a
    real Aither instance (or mock).
 6. **Agent context update** — Run `.specify/scripts/bash/update-agent-context.sh copilot`
-   to record new tech (MUX SDK, Playback module) and paths; preserve manual
+   to record new tech (native AVFoundation/AVKit, Playback module) and paths; preserve manual
    additions; update the plan reference between the SPECKIT markers in
    `.github/copilot-instructions.md`.
 
