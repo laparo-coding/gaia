@@ -3,13 +3,13 @@
     "codacy": {
       "type": "local",
       "command": "bash",
-      "args": ["/Users/Andreas/GitHub/gaia/.vscode/codacy-mcp.sh"],
+      "args": [".vscode/codacy-mcp.sh"],
       "tools": ["*"]
     },
     "context7": {
       "type": "local",
       "command": "bash",
-      "args": ["/Users/Andreas/GitHub/gaia/.vscode/context7-mcp.sh"],
+      "args": [".vscode/context7-mcp.sh"],
       "tools": ["*"]
     },
     "playwright": {
@@ -23,7 +23,7 @@
       "command": "npx",
       "args": ["-y", "@rollbar/mcp-server@latest"],
       "env": {
-        "ROLLBAR_CONFIG_FILE": "/Users/Andreas/GitHub/gaia/.rollbar-mcp.json"
+        "ROLLBAR_CONFIG_FILE": ".rollbar-mcp.json"
       },
       "tools": ["*"]
     },
