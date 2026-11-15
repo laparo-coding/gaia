@@ -70,8 +70,8 @@ public actor PlaybackCommandMonitor {
   public static func normalizedRecordingId(_ raw: String) -> String {
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty,
-          trimmed.count <= Self.maxRecordingIdLength,
-          trimmed.rangeOfCharacter(from: Self.allowedRecordingIdCharset) == nil
+      trimmed.count <= Self.maxRecordingIdLength,
+      trimmed.rangeOfCharacter(from: Self.allowedRecordingIdCharset) == nil
     else {
       return "invalid"
     }
@@ -177,10 +177,12 @@ public actor PlaybackCommandMonitor {
   // MARK: - Request
 
   private func makeRequest() async throws -> URLRequest {
-    guard var components = URLComponents(
-      url: baseURL.appendingPathComponent("api/recording/events"),
-      resolvingAgainstBaseURL: false
-    ) else {
+    guard
+      var components = URLComponents(
+        url: baseURL.appendingPathComponent("api/recording/events"),
+        resolvingAgainstBaseURL: false
+      )
+    else {
       throw PlaybackSyncError.invalidURL
     }
     components.queryItems = [URLQueryItem(name: "recordingId", value: recordingId)]

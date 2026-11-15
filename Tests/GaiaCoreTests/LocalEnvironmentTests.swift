@@ -52,11 +52,14 @@ struct LocalEnvironmentTests {
       appName: "GaiaCLI",
       environment: [
         "GAIA_OPENROUTER_DIAGNOSTICS": "true",
-        LocalEnvironment.openRouterAPIKeyKey: "secret-token"
+        LocalEnvironment.openRouterAPIKeyKey: "secret-token",
       ]
     )
 
-    #expect(message == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 12).")
+    #expect(
+      message
+        == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 12)."
+    )
   }
 
   @Test
@@ -66,7 +69,8 @@ struct LocalEnvironmentTests {
       environment: ["GAIA_OPENROUTER_DIAGNOSTICS": "true"]
     )
 
-    #expect(message == "[OpenRouter] deaktiviert fuer GaiaCLI: kein GAIA_OPENROUTER_API_KEY gesetzt.")
+    #expect(
+      message == "[OpenRouter] deaktiviert fuer GaiaCLI: kein GAIA_OPENROUTER_API_KEY gesetzt.")
   }
 
   @Test
@@ -75,11 +79,14 @@ struct LocalEnvironmentTests {
       appName: "GaiaCLI",
       environment: [
         "GAIA_OPENROUTER_DIAGNOSTICS": "true",
-        LocalEnvironment.openRouterLegacyAPIKeyKey: "legacy-secret"
+        LocalEnvironment.openRouterLegacyAPIKeyKey: "legacy-secret",
       ]
     )
 
-    #expect(message == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 13).")
+    #expect(
+      message
+        == "[OpenRouter] aktiv fuer GaiaCLI (token source: GAIA_OPENROUTER_API_KEY, token length: 13)."
+    )
   }
 
   @Test
