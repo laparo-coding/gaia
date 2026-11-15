@@ -14,7 +14,8 @@ struct PlaybackCommandMonitorTests {
       data: #"{"action":"play"}"#
     )
     guard case .play = command else {
-      Issue.record("Expected .play"); return
+      Issue.record("Expected .play")
+      return
     }
   }
 
@@ -24,7 +25,8 @@ struct PlaybackCommandMonitorTests {
       data: #"{"action":"stop"}"#
     )
     guard case .stop = command else {
-      Issue.record("Expected .stop"); return
+      Issue.record("Expected .stop")
+      return
     }
   }
 
@@ -34,7 +36,8 @@ struct PlaybackCommandMonitorTests {
       data: #"{"action":"seek","position":12.5}"#
     )
     guard case .seek(let position) = command else {
-      Issue.record("Expected .seek"); return
+      Issue.record("Expected .seek")
+      return
     }
     #expect(position == 12.5)
   }
@@ -45,7 +48,8 @@ struct PlaybackCommandMonitorTests {
       data: #"{"action":"chapter-boundary","chapterId":0,"nextChapterId":1}"#
     )
     guard case .chapterBoundary(let chapterId, let nextChapterId) = command else {
-      Issue.record("Expected .chapterBoundary"); return
+      Issue.record("Expected .chapterBoundary")
+      return
     }
     #expect(chapterId == 0)
     #expect(nextChapterId == 1)
@@ -57,7 +61,8 @@ struct PlaybackCommandMonitorTests {
       data: #"{"action":"chapter-boundary","chapterId":2}"#
     )
     guard case .chapterBoundary(let chapterId, let nextChapterId) = command else {
-      Issue.record("Expected .chapterBoundary"); return
+      Issue.record("Expected .chapterBoundary")
+      return
     }
     #expect(chapterId == 2)
     #expect(nextChapterId == nil)

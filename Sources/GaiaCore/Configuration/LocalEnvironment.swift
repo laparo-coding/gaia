@@ -244,7 +244,8 @@ public enum LocalEnvironment {
   ) throws -> URL {
     let key = baseURLKey(for: service)
 
-    guard let rawValue = environment[key], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    guard let rawValue = environment[key],
+      !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     else {
       throw ConfigurationError.missingServiceBaseURL(service: service, key: key)
     }
@@ -365,7 +366,8 @@ public enum LocalEnvironment {
 
     var urls: [URL] = []
     for key in keys {
-      guard let rawValue = environment[key], !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+      guard let rawValue = environment[key],
+        !rawValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       else {
         continue
       }
@@ -528,7 +530,8 @@ public enum LocalEnvironment {
     }
 
     if let token = resolvedOpenRouterAccessToken(from: environment) {
-      return "[OpenRouter] aktiv fuer \(appName) (token source: \(token.source), token length: \(token.value.count))."
+      return
+        "[OpenRouter] aktiv fuer \(appName) (token source: \(token.source), token length: \(token.value.count))."
     }
 
     return "[OpenRouter] deaktiviert fuer \(appName): kein GAIA_OPENROUTER_API_KEY gesetzt."
@@ -685,12 +688,15 @@ public enum LocalEnvironment {
     return value
   }
 
-  static func resolvedOpenRouterAccessToken(from environment: [String: String]) -> TokenConfiguration? {
+  static func resolvedOpenRouterAccessToken(from environment: [String: String])
+    -> TokenConfiguration?
+  {
     var normalizedEnvironment = environment
     normalizeOpenRouterEnvironment(in: &normalizedEnvironment)
 
     guard
-      let value = normalizedEnvironment[openRouterAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines),
+      let value = normalizedEnvironment[openRouterAPIKeyKey]?.trimmingCharacters(
+        in: .whitespacesAndNewlines),
       !value.isEmpty
     else {
       return nil
@@ -741,8 +747,10 @@ public enum LocalEnvironment {
   }
 
   static func normalizeOpenRouterEnvironment(in environment: inout [String: String]) {
-    let canonicalValue = environment[openRouterAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let legacyValue = environment[openRouterLegacyAPIKeyKey]?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let canonicalValue = environment[openRouterAPIKeyKey]?.trimmingCharacters(
+      in: .whitespacesAndNewlines)
+    let legacyValue = environment[openRouterLegacyAPIKeyKey]?.trimmingCharacters(
+      in: .whitespacesAndNewlines)
 
     if isBlank(canonicalValue), let legacyValue, !legacyValue.isEmpty {
       environment[openRouterAPIKeyKey] = legacyValue
